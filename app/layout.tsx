@@ -13,7 +13,7 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  metadataBase: new URL(process.env.SITE_URL ?? 'http://localhost:3000'),
+  metadataBase: new URL('https://bayarin-household-organizer.gunz123.chatgpt.site'),
   title: 'Bayarin — Bayad. Organisado. Panatag.',
   description: 'A Philippines-first household command center for bills, reminders, and obligations.',
   openGraph: {
