@@ -1,7 +1,9 @@
 # Bayarin Supabase setup
 
 1. Create or select a Supabase project.
-2. Run `supabase/migrations/202609030001_bayarin_auth.sql` in the Supabase SQL editor.
+2. Run these migrations in order in the Supabase SQL editor:
+   - `supabase/migrations/202609030001_bayarin_auth.sql`
+   - `supabase/migrations/202609030002_household_features.sql`
 3. In Authentication → URL Configuration, set the Site URL to:
    `https://bayarin-household-organizer.gunz123.chatgpt.site`
 4. Add these redirect URLs:

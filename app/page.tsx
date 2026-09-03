@@ -6,8 +6,8 @@ import {
   AlertTriangle, ArrowLeft, ArrowUpRight, Bell, CalendarDays, Check,
   CheckCircle2, ChevronRight, CircleHelp, Clock3, Copy, Eye, EyeOff,
   Droplets, FileText, Globe2, History, Home, Info, KeyRound,
-  Film, Landmark, Languages, LoaderCircle, LockKeyhole, LogOut, Mail, Moon, MoreHorizontal, Pause, Pencil, Play, Plus, ReceiptText,
-  RefreshCw, Router, Settings, ShieldCheck, Smartphone, Sun, Tv, Upload,
+  CreditCard, Download, Film, Landmark, Languages, LoaderCircle, LockKeyhole, LogOut, Mail, Moon, MoreHorizontal, Pause, Pencil, Play, Plus, ReceiptText,
+  RefreshCw, Router, Search, Settings, ShieldCheck, Smartphone, Sun, Tv, Upload, Users,
   Sparkles, UserRound, UserPlus, WifiOff, X, Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -23,7 +23,10 @@ type Screen =
   | 'edit-bill' | 'mark-paid' | 'success' | 'activity' | 'load' | 'load-detail'
   | 'lingkod' | 'government-detail' | 'notifications' | 'settings' | 'language'
   | 'appearance' | 'privacy' | 'offline' | 'empty' | 'error' | 'story'
+  | 'household' | 'payment-methods' | 'notification-settings' | 'export-data' | 'about' | 'edit-profile'
   | 'login' | 'signup' | 'forgot-password' | 'check-email' | 'reset-password';
+
+const routeScreens: Screen[] = ['welcome','onboarding','home','bills','bill-detail','add-bill','edit-bill','mark-paid','success','activity','load','load-detail','lingkod','government-detail','notifications','settings','language','appearance','privacy','offline','empty','error','story','household','payment-methods','notification-settings','export-data','about','edit-profile','login','signup','forgot-password','check-email','reset-password'];
 
 type Lang = 'English' | 'Filipino' | 'Cebuano';
 
@@ -102,8 +105,8 @@ function AppHeader({ title, onBack, trailing }: { title: string; onBack?: () => 
 function BottomNav({ screen, go }: { screen: Screen; go: (s: Screen) => void }) {
   const items: { key: Screen; label: string; icon: typeof Home }[] = [
     { key: 'home', label: 'Home', icon: Home }, { key: 'bills', label: 'Bills', icon: ReceiptText },
-    { key: 'story', label: 'Story', icon: Sparkles }, { key: 'lingkod', label: 'Lingkod', icon: Landmark },
-    { key: 'settings', label: 'Settings', icon: Settings },
+    { key: 'add-bill', label: 'Add', icon: Plus }, { key: 'lingkod', label: 'Lingkod', icon: Landmark },
+    { key: 'settings', label: 'Profile', icon: UserRound },
   ];
   return <nav className="bottom-nav" aria-label="Primary navigation">{items.map(({ key, label, icon: Icon }) => <button key={key} className={screen === key ? 'active' : ''} onClick={() => go(key)}><Icon /><span>{label}</span></button>)}</nav>;
 }
@@ -211,17 +214,20 @@ function HomeScreen({ go, copy, userName }: { go: (s: Screen) => void; copy: { h
 
 function BillsScreen({ go, userId }: { go: (s: Screen) => void;userId:string }) {
   const [filter,setFilter] = useState('All');
+  const [query,setQuery] = useState('');
   const [userBills,setUserBills]=useState(bills);
   useEffect(()=>{if(!supabase||!userId||userId==='demo-user')return;void supabase.from('bills').select('provider,category,account_number,due_date,amount,status').eq('user_id',userId).neq('status','archived').order('due_date').then(({data})=>{if(!data?.length)return;setUserBills(data.map(row=>{const provider=String(row.provider).toUpperCase();const status=String(row.status).split('_').map(word=>word[0].toUpperCase()+word.slice(1)).join(' ');const tone=provider==='MERALCO'?'orange':provider==='MAYNILAD'?'blue':provider==='PLDT'?'red':'indigo';return {provider,category:String(row.category),account:String(row.account_number||'').slice(-4),due:new Intl.DateTimeFormat('en-PH',{month:'short',day:'numeric',year:'numeric'}).format(new Date(`${row.due_date}T00:00:00`)),amount:new Intl.NumberFormat('en-PH',{style:'currency',currency:'PHP'}).format(Number(row.amount)),status,tone}}))})},[userId]);
-  const filtered = filter === 'All' ? userBills : userBills.filter(b => b.status === filter);
+  const filtered = userBills.filter(b => (filter === 'All' || b.status === filter) && `${b.provider} ${b.category} ${b.account}`.toLowerCase().includes(query.toLowerCase()));
   return <><AppHeader title="Bills" trailing={<button className="header-action accent" onClick={() => go('add-bill')} aria-label="Add bill"><Plus /></button>}/><ScrollScreen className="with-nav">
     <section className="bill-summary"><span>Still unpaid</span><b>₱7,591.00</b><small>Across 3 remaining bills</small><div><span><i className="amber-dot"/>2 due soon</span><span><i className="red-dot"/>1 overdue</span></div></section>
-    <div className="filter-strip">{['All','Due soon','Upcoming','Paid','Overdue'].map(f => <button key={f} className={filter===f?'active':''} onClick={()=>setFilter(f)}>{f}</button>)}</div>
+    <label className="bill-search"><Search/><input value={query} onChange={e=>setQuery(e.target.value)} placeholder="Search bills" aria-label="Search bills"/></label><div className="filter-strip">{['All','Due soon','Upcoming','Paid','Overdue'].map(f => <button key={f} className={filter===f?'active':''} onClick={()=>setFilter(f)}>{f}</button>)}</div>
     <div className="bill-list">{filtered.length ? filtered.map(b => <button className="bill-card" key={b.provider} onClick={() => go('bill-detail')}><div className="bill-card-top"><ProviderMark tone={b.tone} letter={b.provider[0]}/><div><b>{b.provider}</b><span>{b.category} · •••• {b.account}</span></div><ChevronRight /></div><div className="bill-card-bottom"><div><span>Due date</span><b>{b.due}</b></div><div className="amount-side"><strong>{b.amount}</strong><StatusPill status={b.status}/></div></div></button>) : <EmptyState go={go}/>}</div>
   </ScrollScreen><BottomNav screen="bills" go={go}/></>;
 }
 
-function BillDetail({ go, setPayOpen }: { go:(s:Screen)=>void; setPayOpen:(v:boolean)=>void }) {
+function BillDetail({ go, setPayOpen, userId, demo }: { go:(s:Screen)=>void; setPayOpen:(v:boolean)=>void;userId:string;demo:boolean }) {
+  const [archiving,setArchiving]=useState(false);
+  const archive=async()=>{setArchiving(true);if(!demo&&supabase){const {data}=await supabase.from('bills').select('id').eq('user_id',userId).eq('provider','MERALCO').limit(1).maybeSingle();if(data)await supabase.from('bills').update({status:'archived'}).eq('id',data.id).eq('user_id',userId)}setArchiving(false);go('bills')};
   return <><AppHeader title="Bill details" onBack={() => go('bills')} trailing={<button className="header-action" onClick={() => go('edit-bill')} aria-label="Edit bill"><Pencil /></button>}/><ScrollScreen>
     <section className="provider-hero"><ProviderMark tone="orange" letter="M"/><div><h2>MERALCO</h2><p>Electricity · Bahay</p></div><StatusPill status="Due soon"/></section>
     <section className="detail-card account-card"><div><span>Account number</span><b>1234 5678 9012</b></div><button><Copy/> Copy</button></section>
@@ -229,7 +235,7 @@ function BillDetail({ go, setPayOpen }: { go:(s:Screen)=>void; setPayOpen:(v:boo
     <section className="detail-card reminder-row"><div><span className="icon-soft"><Bell/></span><span><b>Payment reminder</b><small>3 days before · 9:00 AM</small></span></div><Switch defaultChecked aria-label="Payment reminder"/></section>
     <div className="detail-actions"><Button className="primary-button" onClick={()=>setPayOpen(true)}>Pay outside Bayarin <ArrowUpRight/></Button><Button variant="outline" className="secondary-button" onClick={()=>go('mark-paid')}><Check/> Mark as paid</Button></div>
     <p className="legal-inline"><Info/> Bayarin records your status only. Payments happen outside the app.</p>
-    <div className="text-actions"><button onClick={()=>go('edit-bill')}>Edit</button><button>Archive</button></div>
+    <div className="text-actions"><button onClick={()=>go('edit-bill')}><Pencil/> Edit bill</button><button onClick={()=>void archive()} disabled={archiving}><X/> {archiving?'Archiving…':'Archive'}</button></div>
   </ScrollScreen></>;
 }
 
@@ -262,12 +268,14 @@ function Success({ go }: { go:(s:Screen)=>void }) {
 }
 
 function ActivityScreen({ go }: { go:(s:Screen)=>void }) {
+  const [filter,setFilter]=useState('All');
   const items = [
-    ['M','orange','MERALCO','Marked paid','Sep 2 · 9:41 AM','₱2,450.36','Paid'],
-    ['W','blue','MAYNILAD','Bill added','Sep 1 · 8:15 AM','₱598.00','Upcoming'],
-    ['G','indigo','GLOBE','Reminder updated','Aug 30 · 7:22 PM','₱599.00','Due soon'],
+    ['M','orange','MERALCO','Marked paid','Sep 2 · 9:41 AM','₱2,450.36','Paid','Bills'],
+    ['W','blue','MAYNILAD','Bill added','Sep 1 · 8:15 AM','₱598.00','Upcoming','Bills'],
+    ['G','indigo','GLOBE','Reminder updated','Aug 30 · 7:22 PM','₱599.00','Due soon','Load'],
   ];
-  return <><AppHeader title="Activity" onBack={()=>go('home')}/><ScrollScreen><div className="filter-strip"><button className="active">All</button><button>Bills</button><button>Load</button><button>Lingkod</button></div><h3 className="month-title">September 2026</h3><section className="activity-card">{items.map(i=><div className="activity-row" key={i[2]}><ProviderMark tone={i[1]} letter={i[0]}/><div><b>{i[2]}</b><span>{i[3]}</span><small>{i[4]}</small></div><div><strong>{i[5]}</strong><StatusPill status={i[6]}/></div></div>)}</section><h3 className="month-title">August 2026</h3><section className="activity-card"><div className="activity-row"><ProviderMark tone="red" letter="P"/><div><b>PLDT</b><span>Bill added</span><small>Aug 28 · 9:10 AM</small></div><div><strong>₱1,699.00</strong><StatusPill status="Overdue"/></div></div></section></ScrollScreen></>;
+  const visible=filter==='All'?items:items.filter(item=>item[7]===filter);
+  return <><AppHeader title="Activity" onBack={()=>go('home')}/><ScrollScreen><div className="filter-strip">{['All','Bills','Load','Lingkod'].map(item=><button key={item} className={filter===item?'active':''} onClick={()=>setFilter(item)}>{item}</button>)}</div><h3 className="month-title">September 2026</h3><section className="activity-card">{visible.length?visible.map(i=><div className="activity-row" key={i[2]}><ProviderMark tone={i[1]} letter={i[0]}/><div><b>{i[2]}</b><span>{i[3]}</span><small>{i[4]}</small></div><div><strong>{i[5]}</strong><StatusPill status={i[6]}/></div></div>):<div className="activity-empty"><CheckCircle2/><span>No {filter.toLowerCase()} activity yet.</span></div>}</section>{filter==='All'&&<><h3 className="month-title">August 2026</h3><section className="activity-card"><div className="activity-row"><ProviderMark tone="red" letter="P"/><div><b>PLDT</b><span>Bill added</span><small>Aug 28 · 9:10 AM</small></div><div><strong>₱1,699.00</strong><StatusPill status="Overdue"/></div></div></section></>}</ScrollScreen></>;
 }
 
 function MarketingStory({ go }: { go:(s:Screen)=>void }) {
@@ -300,11 +308,52 @@ function GovernmentDetail({ go }: { go:(s:Screen)=>void }) {
 }
 
 function Notifications({ go }: { go:(s:Screen)=>void }) {
-  return <><AppHeader title="Notifications" onBack={()=>go('home')} trailing={<button className="text-button">Mark all read</button>}/><ScrollScreen><div className="notification-group"><h3>Today</h3><button className="notification unread" onClick={()=>go('bill-detail')}><span className="note-icon amber"><Clock3/></span><div><b>Meralco is due in 6 days</b><p>₱2,450.36 · Sep 8</p><small>9:00 AM</small></div><i/></button><button className="notification unread" onClick={()=>go('government-detail')}><span className="note-icon green"><Landmark/></span><div><b>SSS contribution is due Sep 10</b><p>Review the details before visiting the official site.</p><small>8:30 AM</small></div><i/></button></div><div className="notification-group"><h3>Yesterday</h3><button className="notification"><span className="note-icon neutral"><Smartphone/></span><div><b>Globe load reminder is tomorrow</b><p>Typical amount · ₱99</p><small>Sep 1</small></div></button></div></ScrollScreen></>;
+  const [unread,setUnread]=useState(true);
+  return <><AppHeader title="Notifications" onBack={()=>go('home')} trailing={<button className="text-button" onClick={()=>setUnread(false)}>{unread?'Mark all read':'All read'}</button>}/><ScrollScreen><div className="notification-group"><h3>Today</h3><button className={`notification ${unread?'unread':''}`} onClick={()=>{setUnread(false);go('bill-detail')}}><span className="note-icon amber"><Clock3/></span><div><b>Meralco is due in 6 days</b><p>₱2,450.36 · Sep 8</p><small>9:00 AM</small></div>{unread&&<i/>}</button><button className={`notification ${unread?'unread':''}`} onClick={()=>{setUnread(false);go('government-detail')}}><span className="note-icon green"><Landmark/></span><div><b>SSS contribution is due Sep 10</b><p>Review the details before visiting the official site.</p><small>8:30 AM</small></div>{unread&&<i/>}</button></div><div className="notification-group"><h3>Yesterday</h3><button className="notification"><span className="note-icon neutral"><Smartphone/></span><div><b>Globe load reminder is tomorrow</b><p>Typical amount · ₱99</p><small>Sep 1</small></div></button></div></ScrollScreen></>;
+}
+
+type HouseholdMember = { id:string; name:string; role:string; contact?:string };
+
+function EditProfileScreen({ go, userId, demo, userName, setUserName }: { go:(s:Screen)=>void;userId:string;demo:boolean;userName:string;setUserName:(name:string)=>void }) {
+  const [name,setName]=useState(userName);const [household,setHousehold]=useState('Dela Cruz Household');const [saving,setSaving]=useState(false);const [message,setMessage]=useState('');
+  const save=async(e:FormEvent)=>{e.preventDefault();setSaving(true);setMessage('');if(!demo&&supabase){const {error}=await supabase.from('profiles').update({full_name:name.trim(),household_name:household.trim()}).eq('id',userId);if(error){setMessage(error.message);setSaving(false);return}}setUserName(name.trim()||'Home organizer');setSaving(false);setMessage('Profile updated.');window.setTimeout(()=>go('settings'),500)};
+  return <><AppHeader title="Edit profile" onBack={()=>go('settings')}/><ScrollScreen><div className="profile-edit-hero"><div className="avatar portrait large"><img src="/assets/bayarin-auth-3d.png" alt=""/></div><BrandLogo/></div><form className="form-card" onSubmit={save}><label>Display name<Input value={name} onChange={e=>setName(e.target.value)} required/></label><label>Household name<Input value={household} onChange={e=>setHousehold(e.target.value)} required/></label><label>Email<Input value={demo?DEMO_EMAIL:'Connected Supabase account'} readOnly/></label>{message&&<div className="save-message"><Check/>{message}</div>}<Button type="submit" className="primary-button" disabled={saving}>{saving?<LoaderCircle className="spin"/>:<Check/>} Save profile</Button></form></ScrollScreen></>;
+}
+
+function HouseholdScreen({ go, userId, demo }: { go:(s:Screen)=>void;userId:string;demo:boolean }) {
+  const [members,setMembers]=useState<HouseholdMember[]>([{id:'demo-1',name:'Juan Dela Cruz',role:'Organizer',contact:'You'},{id:'demo-2',name:'Maria Dela Cruz',role:'Household member',contact:'maria@email.com'}]);const [adding,setAdding]=useState(false);const [name,setName]=useState('');
+  useEffect(()=>{if(demo||!supabase||!userId)return;void supabase.from('household_members').select('id,name,role,contact').eq('user_id',userId).order('created_at').then(({data})=>{if(data?.length)setMembers(data as HouseholdMember[])})},[demo,userId]);
+  const add=async(e:FormEvent)=>{e.preventDefault();const member={id:`local-${Date.now()}`,name:name.trim(),role:'Household member',contact:''};if(!member.name)return;if(!demo&&supabase){const {data,error}=await supabase.from('household_members').insert({user_id:userId,name:member.name,role:member.role}).select('id,name,role,contact').single();if(!error&&data)setMembers(current=>[...current,data as HouseholdMember])}else setMembers(current=>[...current,member]);setName('');setAdding(false)};
+  const remove=async(member:HouseholdMember)=>{if(!demo&&supabase&&!member.id.startsWith('demo'))await supabase.from('household_members').delete().eq('id',member.id).eq('user_id',userId);setMembers(current=>current.filter(item=>item.id!==member.id))};
+  return <><AppHeader title="Household members" onBack={()=>go('settings')} trailing={<button className="header-action accent" onClick={()=>setAdding(!adding)} aria-label="Add household member"><Plus/></button>}/><ScrollScreen><div className="page-lead"><span className="lead-icon"><Users/></span><div><h2>Dela Cruz Household</h2><p>Share organizing—not banking access.</p></div></div><div className="info-banner"><ShieldCheck/><span>Members can help track household records. Bayarin never stores wallet or bank passwords.</span></div>{adding&&<form className="inline-add" onSubmit={add}><Input value={name} onChange={e=>setName(e.target.value)} placeholder="Member name" autoFocus/><Button type="submit">Add</Button></form>}<section className="member-list">{members.map((member,index)=><article key={member.id}><span className="member-avatar">{member.name.split(' ').map(part=>part[0]).join('').slice(0,2)}</span><div><b>{member.name}</b><small>{member.role}{member.contact?` · ${member.contact}`:''}</small></div>{index>0&&<button onClick={()=>void remove(member)} aria-label={`Remove ${member.name}`}><X/></button>}</article>)}</section></ScrollScreen></>;
+}
+
+function PaymentMethodsScreen({ go }: { go:(s:Screen)=>void }) {
+  const methods=[['G','GCash','Opens outside Bayarin'],['M','Maya','Opens outside Bayarin'],['B','BPI / bank app','Opens outside Bayarin']];
+  return <><AppHeader title="Payment methods" onBack={()=>go('settings')}/><ScrollScreen><div className="payment-hero"><CreditCard/><h2>Pay your way</h2><p>Bayarin organizes the details, then sends you to the provider or payment app you choose.</p></div><div className="info-banner"><Info/><span>No cards, PINs, OTPs, or wallet passwords are stored in Bayarin.</span></div><section className="method-list">{methods.map(method=><button key={method[1]} onClick={()=>go('bill-detail')}><span>{method[0]}</span><div><b>{method[1]}</b><small>{method[2]}</small></div><ArrowUpRight/></button>)}</section><Button className="primary-button" onClick={()=>go('bill-detail')}>Try the safe payment flow <ChevronRight/></Button></ScrollScreen></>;
+}
+
+function NotificationSettingsScreen({ go, userId, demo }: { go:(s:Screen)=>void;userId:string;demo:boolean }) {
+  const [prefs,setPrefs]=useState({due_soon:true,weekly_summary:true,payment_updates:true,government_deadlines:true});const [saved,setSaved]=useState(false);
+  useEffect(()=>{if(demo||!supabase||!userId)return;void supabase.from('notification_preferences').select('due_soon,weekly_summary,payment_updates,government_deadlines').eq('user_id',userId).maybeSingle().then(({data})=>{if(data)setPrefs(data)})},[demo,userId]);
+  const toggle=(key:keyof typeof prefs)=>setPrefs(value=>({...value,[key]:!value[key]}));
+  const save=async()=>{if(!demo&&supabase)await supabase.from('notification_preferences').upsert({user_id:userId,...prefs});setSaved(true);window.setTimeout(()=>setSaved(false),1800)};
+  const rows:[keyof typeof prefs,string,string][]=[['due_soon','Due-soon reminders','Three days before a bill'],['weekly_summary','Weekly household summary','Every Monday morning'],['payment_updates','Payment record updates','When a bill is marked paid'],['government_deadlines','Lingkod deadlines','Before public-service dates']];
+  return <><AppHeader title="Notification settings" onBack={()=>go('settings')}/><ScrollScreen><div className="page-copy"><h2>Gentle reminders, your way.</h2><p>Choose what deserves your attention.</p></div><section className="preference-list">{rows.map(([key,title,body])=><div key={key}><span><b>{title}</b><small>{body}</small></span><Switch checked={prefs[key]} onCheckedChange={()=>toggle(key)} aria-label={title}/></div>)}</section><Button className="primary-button sticky-cta" onClick={()=>void save()}>{saved?<><Check/> Saved</>:<>Save preferences <Check/></>}</Button></ScrollScreen></>;
+}
+
+function ExportDataScreen({ go, userId, demo }: { go:(s:Screen)=>void;userId:string;demo:boolean }) {
+  const [exporting,setExporting]=useState(false);const [done,setDone]=useState(false);
+  const download=async()=>{setExporting(true);let payload:unknown={profile:{name:'Juan Dela Cruz',household:'Dela Cruz Household'},bills,exported_at:new Date().toISOString(),mode:'demo'};if(!demo&&supabase){const [profileResult,billResult,activityResult]=await Promise.all([supabase.from('profiles').select('*').eq('id',userId).maybeSingle(),supabase.from('bills').select('*').eq('user_id',userId),supabase.from('activity_events').select('*').eq('user_id',userId)]);payload={profile:profileResult.data,bills:billResult.data,activity:activityResult.data,exported_at:new Date().toISOString()}}const url=URL.createObjectURL(new Blob([JSON.stringify(payload,null,2)],{type:'application/json'}));const link=document.createElement('a');link.href=url;link.download='bayarin-household-export.json';link.click();URL.revokeObjectURL(url);setExporting(false);setDone(true)};
+  return <><AppHeader title="Export data" onBack={()=>go('settings')}/><ScrollScreen><div className="export-hero"><Download/><h2>Take your records with you.</h2><p>Download a readable JSON copy of your profile, household bills, and activity.</p></div><section className="export-list"><div><Check/><span><b>Profile and household</b><small>Names and app preferences</small></span></div><div><Check/><span><b>Bills and reminders</b><small>Amounts, dates, and statuses</small></span></div><div><Check/><span><b>Activity history</b><small>Recorded household actions</small></span></div></section><Button className="primary-button" onClick={()=>void download()} disabled={exporting}>{exporting?<LoaderCircle className="spin"/>:<Download/>}{done?' Download again':' Download my data'}</Button><p className="legal-inline"><ShieldCheck/> The export is created only when you request it.</p></ScrollScreen></>;
+}
+
+function AboutScreen({ go }: { go:(s:Screen)=>void }) {
+  return <><AppHeader title="About Bayarin" onBack={()=>go('settings')}/><ScrollScreen><section className="about-hero"><img src="/assets/bayarin-story-3d.png" alt="3D Bayarin household organizer"/><div><BrandLogo inverted/><h2>Everyday bills,<br/>beautifully organized.</h2><p>Bayarin is a Philippines-first household organizer. It tracks records and reminders while payments stay with trusted external providers.</p></div></section><section className="about-features"><div><CalendarDays/><span><b>Organize bills</b><small>One calm household view</small></span></div><div><Bell/><span><b>Get reminders</b><small>Before due dates arrive</small></span></div><div><ShieldCheck/><span><b>Protect your data</b><small>Private, account-owned records</small></span></div></section><Button className="primary-button" onClick={()=>go('story')}><Play/> Watch the Bayarin story</Button><p className="version-note">Bayarin 2.0 · Designed for Filipino households</p></ScrollScreen></>;
 }
 
 function SettingsScreen({ go, dark, lang, userName, email, onLogout }: { go:(s:Screen)=>void; dark:boolean; lang:Lang;userName:string;email:string;onLogout:()=>void }) {
-  return <><AppHeader title="Settings"/><ScrollScreen className="with-nav"><section className="profile-card"><div className="avatar large portrait"><img src="/assets/bayarin-auth-3d.png" alt=""/></div><div><b>{userName}</b><span>{email}</span></div><button aria-label="Edit profile"><Pencil/></button></section><SettingsGroup title="Experience"><Setting icon={<Film/>} label="Bayarin story" value="AI motion film" onClick={()=>go('story')}/></SettingsGroup><SettingsGroup title="Preferences"><Setting icon={<Languages/>} label="Language" value={lang} onClick={()=>go('language')}/><Setting icon={dark?<Moon/>:<Sun/>} label="Appearance" value={dark?'Dark':'Light'} onClick={()=>go('appearance')}/><Setting icon={<Bell/>} label="Notifications" value="On" onClick={()=>go('notifications')}/></SettingsGroup><SettingsGroup title="Your data"><Setting icon={<ShieldCheck/>} label="Privacy & security" value="Supabase RLS" onClick={()=>go('privacy')}/><Setting icon={<History/>} label="Household activity" onClick={()=>go('activity')}/></SettingsGroup><SettingsGroup title="Preview states"><Setting icon={<WifiOff/>} label="Offline state" onClick={()=>go('offline')}/><Setting icon={<CircleHelp/>} label="Empty & error states" onClick={()=>go('empty')}/></SettingsGroup><button className="logout-button" onClick={onLogout}><LogOut/> Log out</button><section className="settings-note"><BrandLogo/><div><span>Version 2.0 · Made for Filipino households</span></div></section></ScrollScreen><BottomNav screen="settings" go={go}/></>;
+  return <><AppHeader title="Profile"/><ScrollScreen className="with-nav"><section className="profile-card"><div className="avatar large portrait"><img src="/assets/bayarin-auth-3d.png" alt=""/></div><div><b>{userName}</b><span>{email}</span></div><button aria-label="Edit profile" onClick={()=>go('edit-profile')}><Pencil/></button></section><SettingsGroup title="Household"><Setting icon={<Users/>} label="Household members" onClick={()=>go('household')}/><Setting icon={<CreditCard/>} label="Payment methods" value="GCash, Maya, BPI" onClick={()=>go('payment-methods')}/></SettingsGroup><SettingsGroup title="Preferences"><Setting icon={<Bell/>} label="Notifications" value="On" onClick={()=>go('notification-settings')}/><Setting icon={<Languages/>} label="Language" value={lang} onClick={()=>go('language')}/><Setting icon={dark?<Moon/>:<Sun/>} label="Appearance" value={dark?'Dark':'Light'} onClick={()=>go('appearance')}/></SettingsGroup><SettingsGroup title="Your data"><Setting icon={<ShieldCheck/>} label="Privacy & security" value="Supabase RLS" onClick={()=>go('privacy')}/><Setting icon={<Download/>} label="Export data" onClick={()=>go('export-data')}/><Setting icon={<History/>} label="Household activity" onClick={()=>go('activity')}/></SettingsGroup><SettingsGroup title="Bayarin"><Setting icon={<Film/>} label="Bayarin story" value="AI motion film" onClick={()=>go('story')}/><Setting icon={<Info/>} label="About Bayarin" value="Version 2.0" onClick={()=>go('about')}/></SettingsGroup><button className="logout-button" onClick={onLogout}><LogOut/> Log out</button><section className="settings-note"><BrandLogo/><div><span>Made for Filipino households</span></div></section></ScrollScreen><BottomNav screen="settings" go={go}/></>;
 }
 
 function SettingsGroup({ title, children }: { title:string; children:ReactNode }) { return <section className="settings-group"><h3>{title}</h3><div>{children}</div></section>; }
@@ -330,8 +379,10 @@ function StateScreen({ kind, go }: { kind:'offline'|'empty'|'error';go:(s:Screen
 }
 
 function PaySheet({ open, setOpen, onLeave }: { open:boolean;setOpen:(v:boolean)=>void;onLeave:()=>void }) {
+  const [copied,setCopied]=useState(false);
   const choose=()=>{setOpen(false);onLeave()};
-  return <Sheet open={open} onOpenChange={setOpen}><SheetContent side="bottom" className="pay-sheet"><SheetHeader><span className="sheet-handle"/><SheetTitle>Pay outside Bayarin</SheetTitle><SheetDescription>Bayarin does not process payments. Choose where you want to continue.</SheetDescription></SheetHeader><div className="sheet-bill"><ProviderMark tone="orange" letter="M"/><div><b>MERALCO</b><span>Account •••• 9012</span></div><strong>₱2,450.36</strong></div><div className="external-options"><button onClick={choose}><span className="external-icon gcash">G</span><b>Open GCash</b><ArrowUpRight/></button><button onClick={choose}><span className="external-icon maya">M</span><b>Open Maya</b><ArrowUpRight/></button><button onClick={choose}><span className="external-icon web"><Globe2/></span><b>Open biller’s website</b><ArrowUpRight/></button><button><span className="external-icon copy"><Copy/></span><b>Copy payment details</b><Check/></button></div><SheetFooter><p><ShieldCheck/> You’ll complete the payment outside Bayarin.</p></SheetFooter></SheetContent></Sheet>;
+  const copy=async()=>{await navigator.clipboard?.writeText('MERALCO · Account 1234 5678 9012 · ₱2,450.36 · Due Sep 8, 2026');setCopied(true);window.setTimeout(()=>setCopied(false),1600)};
+  return <Sheet open={open} onOpenChange={setOpen}><SheetContent side="bottom" className="pay-sheet"><SheetHeader><span className="sheet-handle"/><SheetTitle>Pay outside Bayarin</SheetTitle><SheetDescription>Bayarin does not process payments. Choose where you want to continue.</SheetDescription></SheetHeader><div className="sheet-bill"><ProviderMark tone="orange" letter="M"/><div><b>MERALCO</b><span>Account •••• 9012</span></div><strong>₱2,450.36</strong></div><div className="external-options"><button onClick={choose}><span className="external-icon gcash">G</span><b>Open GCash</b><ArrowUpRight/></button><button onClick={choose}><span className="external-icon maya">M</span><b>Open Maya</b><ArrowUpRight/></button><button onClick={choose}><span className="external-icon web"><Globe2/></span><b>Open biller’s website</b><ArrowUpRight/></button><button onClick={()=>void copy()}><span className="external-icon copy"><Copy/></span><b>{copied?'Payment details copied':'Copy payment details'}</b><Check/></button></div><SheetFooter><p><ShieldCheck/> You’ll complete the payment outside Bayarin.</p></SheetFooter></SheetContent></Sheet>;
 }
 
 function ReturnPrompt({ open, close, paid }: { open:boolean;close:()=>void;paid:()=>void }) {
@@ -352,6 +403,8 @@ export default function BayarinApp() {
   const [authEmail,setAuthEmail] = useState('');
   const [emailPurpose,setEmailPurpose] = useState<'signup'|'recovery'>('signup');
 
+  const navigate=(next:Screen)=>{setScreen(next);const url=next==='welcome'?'/':`/?screen=${encodeURIComponent(next)}`;window.history.pushState({screen:next},'',url);window.scrollTo({top:0,behavior:'smooth'})};
+  useEffect(()=>{const sync=()=>{const requested=new URL(window.location.href).searchParams.get('screen');if(requested&&routeScreens.includes(requested as Screen))setScreen(requested as Screen)};sync();window.addEventListener('popstate',sync);return()=>window.removeEventListener('popstate',sync)},[]);
   useEffect(()=>{document.documentElement.classList.toggle('dark',dark)},[dark]);
   useEffect(()=>{
     if(!supabase)return;
@@ -401,20 +454,21 @@ export default function BayarinApp() {
 
   if(!authReady)return <main className="app-canvas"><section className="phone-shell auth-loading" aria-label="Loading Bayarin"><div className="status-bar"><span>9:41</span><span className="device-icons">● ◔ ▰</span></div><BrandMark/><LoaderCircle className="spin"/><p>Opening your household…</p></section></main>;
 
-  const protectedScreens:Screen[]=['home','bills','bill-detail','add-bill','edit-bill','mark-paid','success','activity','load','load-detail','lingkod','government-detail','notifications','settings','language','appearance','privacy','offline','empty','error'];
+  const protectedScreens:Screen[]=['home','bills','bill-detail','add-bill','edit-bill','mark-paid','success','activity','load','load-detail','lingkod','government-detail','notifications','settings','language','appearance','privacy','offline','empty','error','household','payment-methods','notification-settings','export-data','edit-profile'];
   const visibleScreen=!session&&!demoMode&&protectedScreens.includes(screen)?'login':screen;
 
   let content:ReactNode;
   switch(visibleScreen){
-    case 'welcome':content=<Welcome go={setScreen}/>;break;case 'onboarding':content=<Onboarding go={setScreen} finish={session||demoMode?completeOnboarding:undefined}/>;break;
-    case 'login':content=<LoginScreen go={setScreen} onAuthenticated={handleAuthenticated} onDemoAuthenticated={handleDemoAuthenticated}/>;break;case 'signup':content=<SignupScreen go={setScreen} setAuthEmail={setAuthEmail} setEmailPurpose={setEmailPurpose} onAuthenticated={handleAuthenticated}/>;break;
-    case 'forgot-password':content=<ForgotPasswordScreen go={setScreen} setAuthEmail={setAuthEmail} setEmailPurpose={setEmailPurpose}/>;break;case 'check-email':content=<CheckEmailScreen go={setScreen} email={authEmail} purpose={emailPurpose}/>;break;case 'reset-password':content=<ResetPasswordScreen go={setScreen}/>;break;
-    case 'home':content=<HomeScreen go={setScreen} copy={languages[lang]} userName={userName}/>;break;case 'bills':content=<BillsScreen go={setScreen} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;
-    case 'bill-detail':content=<BillDetail go={setScreen} setPayOpen={setPayOpen}/>;break;case 'add-bill':content=<BillForm go={setScreen} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;case 'edit-bill':content=<BillForm go={setScreen} userId={session?.user.id||(demoMode?'demo-user':'')} edit/>;break;
-    case 'mark-paid':content=<MarkPaid go={setScreen} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;case 'success':content=<Success go={setScreen}/>;break;case 'activity':content=<ActivityScreen go={setScreen}/>;break;case 'story':content=<MarketingStory go={setScreen}/>;break;
-    case 'load':content=<LoadScreen go={setScreen}/>;break;case 'load-detail':content=<LoadDetail go={setScreen}/>;break;case 'lingkod':content=<LingkodScreen go={setScreen}/>;break;case 'government-detail':content=<GovernmentDetail go={setScreen}/>;break;
-    case 'notifications':content=<Notifications go={setScreen}/>;break;case 'settings':content=<SettingsScreen go={setScreen} dark={dark} lang={lang} userName={userName} email={session?.user.email||authEmail} onLogout={logout}/>;break;case 'language':content=<LanguageScreen go={setScreen} lang={lang} setLang={setLang}/>;break;case 'appearance':content=<AppearanceScreen go={setScreen} dark={dark} setDark={setDark}/>;break;case 'privacy':content=<PrivacyScreen go={setScreen}/>;break;
-    case 'offline':content=<StateScreen kind="offline" go={setScreen}/>;break;case 'empty':content=<StateScreen kind="empty" go={setScreen}/>;break;case 'error':content=<StateScreen kind="error" go={setScreen}/>;break;
+    case 'welcome':content=<Welcome go={navigate}/>;break;case 'onboarding':content=<Onboarding go={navigate} finish={session||demoMode?completeOnboarding:undefined}/>;break;
+    case 'login':content=<LoginScreen go={navigate} onAuthenticated={handleAuthenticated} onDemoAuthenticated={handleDemoAuthenticated}/>;break;case 'signup':content=<SignupScreen go={navigate} setAuthEmail={setAuthEmail} setEmailPurpose={setEmailPurpose} onAuthenticated={handleAuthenticated}/>;break;
+    case 'forgot-password':content=<ForgotPasswordScreen go={navigate} setAuthEmail={setAuthEmail} setEmailPurpose={setEmailPurpose}/>;break;case 'check-email':content=<CheckEmailScreen go={navigate} email={authEmail} purpose={emailPurpose}/>;break;case 'reset-password':content=<ResetPasswordScreen go={navigate}/>;break;
+    case 'home':content=<HomeScreen go={navigate} copy={languages[lang]} userName={userName}/>;break;case 'bills':content=<BillsScreen go={navigate} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;
+    case 'bill-detail':content=<BillDetail go={navigate} setPayOpen={setPayOpen} userId={session?.user.id||(demoMode?'demo-user':'')} demo={demoMode}/>;break;case 'add-bill':content=<BillForm go={navigate} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;case 'edit-bill':content=<BillForm go={navigate} userId={session?.user.id||(demoMode?'demo-user':'')} edit/>;break;
+    case 'mark-paid':content=<MarkPaid go={navigate} userId={session?.user.id||(demoMode?'demo-user':'')}/>;break;case 'success':content=<Success go={navigate}/>;break;case 'activity':content=<ActivityScreen go={navigate}/>;break;case 'story':content=<MarketingStory go={navigate}/>;break;
+    case 'load':content=<LoadScreen go={navigate}/>;break;case 'load-detail':content=<LoadDetail go={navigate}/>;break;case 'lingkod':content=<LingkodScreen go={navigate}/>;break;case 'government-detail':content=<GovernmentDetail go={navigate}/>;break;
+    case 'notifications':content=<Notifications go={navigate}/>;break;case 'settings':content=<SettingsScreen go={navigate} dark={dark} lang={lang} userName={userName} email={session?.user.email||authEmail} onLogout={logout}/>;break;case 'language':content=<LanguageScreen go={navigate} lang={lang} setLang={setLang}/>;break;case 'appearance':content=<AppearanceScreen go={navigate} dark={dark} setDark={setDark}/>;break;case 'privacy':content=<PrivacyScreen go={navigate}/>;break;
+    case 'household':content=<HouseholdScreen go={navigate} userId={session?.user.id||'demo-user'} demo={demoMode}/>;break;case 'payment-methods':content=<PaymentMethodsScreen go={navigate}/>;break;case 'notification-settings':content=<NotificationSettingsScreen go={navigate} userId={session?.user.id||'demo-user'} demo={demoMode}/>;break;case 'export-data':content=<ExportDataScreen go={navigate} userId={session?.user.id||'demo-user'} demo={demoMode}/>;break;case 'about':content=<AboutScreen go={navigate}/>;break;case 'edit-profile':content=<EditProfileScreen go={navigate} userId={session?.user.id||'demo-user'} demo={demoMode} userName={userName} setUserName={setUserName}/>;break;
+    case 'offline':content=<StateScreen kind="offline" go={navigate}/>;break;case 'empty':content=<StateScreen kind="empty" go={navigate}/>;break;case 'error':content=<StateScreen kind="error" go={navigate}/>;break;
   }
   return <main className="app-canvas"><section className="phone-shell" aria-label="Bayarin mobile application"><div className="status-bar"><span>9:41</span><span className="device-icons">● ◔ ▰</span></div>{content}<PaySheet open={payOpen} setOpen={setPayOpen} onLeave={()=>setReturnOpen(true)}/><ReturnPrompt open={returnOpen} close={()=>setReturnOpen(false)} paid={()=>{setReturnOpen(false);setScreen('mark-paid')}}/></section></main>;
 }
