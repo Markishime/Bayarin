@@ -6,7 +6,7 @@ import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Session, User } from '@supabase/supabase-js';
 import { i18n } from './src/i18n';
 import { isSupabaseConfigured, supabase } from './src/lib/supabase';
-import { defaultOnboarding, langToStored, storedToLang } from './src/data';
+import { DEMO_EMAIL, defaultOnboarding, langToStored, storedToLang } from './src/data';
 import { ScreenTransition } from './src/motion';
 import { AppShell } from './src/shell';
 import { dark as darkPalette, light as lightPalette } from './src/theme';
@@ -125,7 +125,7 @@ export default function App() {
   const handleDemoAuthenticated = () => {
     setDemoMode(true);
     setUserName('Juan Dela Cruz');
-    setAuthEmail(DEMO_EMAIL_SAFE);
+    setAuthEmail(DEMO_EMAIL);
     setProfileReady(true);
     setScreen('home');
   };
@@ -252,5 +252,3 @@ export default function App() {
     </GestureHandlerRootView>
   );
 }
-
-const DEMO_EMAIL_SAFE = 'demo@bayarin.app';

@@ -1,7 +1,8 @@
 import type { Bill, HouseholdMember } from './types';
 
-export const DEMO_EMAIL = 'demo@bayarin.app';
-export const DEMO_PASSWORD = 'Bayarin2026!';
+export const DEMO_EMAIL = process.env.EXPO_PUBLIC_DEMO_EMAIL ?? '';
+export const DEMO_PASSWORD = process.env.EXPO_PUBLIC_DEMO_PASSWORD ?? '';
+export const isDemoConfigured = Boolean(DEMO_EMAIL && DEMO_PASSWORD);
 
 export const images = {
   story: require('../assets/bayarin-story-3d.png'),

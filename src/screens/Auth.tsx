@@ -9,7 +9,7 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandLogo, BrandMark, PrimaryButton, SecondaryButton } from '../components/ui';
-import { DEMO_EMAIL, DEMO_PASSWORD, images } from '../data';
+import { DEMO_EMAIL, DEMO_PASSWORD, images, isDemoConfigured } from '../data';
 import type { Copy } from '../i18n';
 import { isSupabaseConfigured, readableAuthError, supabase, supabaseSetupMessage } from '../lib/supabase';
 import { gradient, type Palette } from '../theme';
@@ -92,12 +92,12 @@ export function LoginScreen({
 
   const submit = async () => {
     setError('');
-    if (email.trim().toLowerCase() === DEMO_EMAIL && password === DEMO_PASSWORD) {
+    if (isDemoConfigured && email.trim().toLowerCase() === DEMO_EMAIL.toLowerCase() && password === DEMO_PASSWORD) {
       onDemoAuthenticated();
       return;
     }
     if (!supabase) {
-      setError('Use the demo credentials shown below, or connect Supabase for real accounts.');
+      setError('Connect Supabase for real accounts, or use the demo household login.');
       return;
     }
     setLoading(true);
@@ -111,16 +111,18 @@ export function LoginScreen({
     <AuthShell title={t.auth.loginTitle} subtitle={t.auth.loginSubtitle} go={go} t={t} c={c}>
       <View style={[styles.form, { backgroundColor: c.surface, borderColor: c.border }]}>
         {error ? <View style={[styles.error, { backgroundColor: c.dangerSoft }]}><AlertTriangle size={14} color={c.danger} /><Text style={{ color: c.danger, flex: 1, fontSize: 12 }}>{error}</Text></View> : null}
-        <Pressable onPress={() => { setEmail(DEMO_EMAIL); setPassword(DEMO_PASSWORD); setError(''); }} style={styles.demo}>
-          <View>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Sparkles size={14} color="#1F349C" />
-              <Text style={{ fontWeight: '800', color: '#1F349C' }}>{t.auth.demoTitle}</Text>
+        {isDemoConfigured && (
+          <Pressable onPress={() => { setEmail(DEMO_EMAIL); setPassword(DEMO_PASSWORD); setError(''); }} style={styles.demo}>
+            <View>
+              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+                <Sparkles size={14} color="#1F349C" />
+                <Text style={{ fontWeight: '800', color: '#1F349C' }}>{t.auth.demoTitle}</Text>
+              </View>
+              <Text style={{ fontSize: 11, color: '#1F349C', opacity: 0.7 }}>{t.auth.demoHint}</Text>
             </View>
-            <Text style={{ fontSize: 11, color: '#1F349C', opacity: 0.7 }}>{DEMO_EMAIL}</Text>
-          </View>
-          <Text style={{ fontSize: 11, fontWeight: '800', color: '#1F349C' }}>{t.auth.demoFill}</Text>
-        </Pressable>
+            <Text style={{ fontSize: 11, fontWeight: '800', color: '#1F349C' }}>{t.auth.demoFill}</Text>
+          </Pressable>
+        )}
         <Field label={t.auth.email} value={email} onChange={setEmail} c={c} icon={<Mail size={17} color={c.textMuted} />} autoComplete="email" keyboardType="email-address" />
         <PasswordField label={t.auth.password} value={password} onChange={setPassword} c={c} />
         <Pressable onPress={() => go('forgot-password')} style={{ alignSelf: 'flex-end' }}>
