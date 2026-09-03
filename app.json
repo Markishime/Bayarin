@@ -1,0 +1,40 @@
+{
+  "expo": {
+    "name": "Bayarin",
+    "slug": "bayarin",
+    "version": "2.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "bayarin",
+    "splash": {
+      "image": "./assets/splash-icon.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#102B9A"
+    },
+    "ios": {
+      "supportsTablet": true,
+      "bundleIdentifier": "app.bayarin.household"
+    },
+    "android": {
+      "adaptiveIcon": {
+        "backgroundColor": "#102B9A",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false,
+      "package": "app.bayarin.household"
+    },
+    "web": {
+      "favicon": "./assets/favicon.png",
+      "bundler": "metro"
+    },
+    "plugins": [
+      "expo-av",
+      "expo-web-browser",
+      "expo-image",
+      "expo-sharing"
+    ]
+  }
+}
