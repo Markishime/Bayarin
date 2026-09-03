@@ -9,8 +9,8 @@
 4. Add these redirect URLs:
    - `https://bayarin-household-organizer.gunz123.chatgpt.site/**`
    - `http://localhost:3000/**`
-5. Configure the app with the project URL and publishable key:
-   - `NEXT_PUBLIC_SUPABASE_URL`
-   - `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
+5. Configure the React Native app with the project URL and publishable key in `.env`:
+   - `EXPO_PUBLIC_SUPABASE_URL`
+   - `EXPO_PUBLIC_SUPABASE_PUBLISHABLE_KEY`
 
 Never expose a Supabase secret key or legacy `service_role` key in this client application.
