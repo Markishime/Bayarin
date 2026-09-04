@@ -50,3 +50,4 @@ Thumbs.db
 # local tooling / temp
 /.grok-verify/
 /supabase/.temp/
+.vercel
