@@ -1,40 +1,79 @@
-import { Video, ResizeMode } from 'expo-av';
-import { LinearGradient } from 'expo-linear-gradient';
 import {
-  Bell, Check, CheckCircle2, ChevronRight, Clock3, Landmark, Pause, Pencil, Play,
-  Plus, ShieldCheck, Smartphone, Sparkles, WifiOff, AlertTriangle, RefreshCw,
+  Bell, Check, CheckCircle2, ChevronRight, Clock3, Landmark, Pencil,
+  Plus, ShieldCheck, Smartphone, WifiOff, AlertTriangle, RefreshCw,
 } from 'lucide-react-native';
-import { useRef, useState, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
-import { AppHeader, BottomNav, BrandLogo, Card, InfoBanner, PrimaryButton, ProviderMark, ScreenScroll, SecondaryButton, StatusPill } from '../components/ui';
-import { governmentItems, images, loads, storyVideo } from '../data';
+import { useEffect, useState, type ReactNode } from 'react';
+import { Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { AppHeader, BottomNav, Card, CinematicHero, Field, InfoBanner, PrimaryButton, ProviderMark, ScreenScroll, SecondaryButton, StatusPill } from '../components/ui';
+import { governmentServices, loads, type GovernmentService } from '../data';
 import type { Copy } from '../i18n';
-import { gradient, type Palette } from '../theme';
+import { supabase } from '../lib/supabase';
+import { useRealtimeActivity, useRealtimeBills, useRealtimeNotifications } from '../services/realtime';
+import { createBillActivityEvent, fetchHouseholdActivityEvents, fetchHouseholdBills, formatBillDisplay, markBillPaid, type DbActivityEvent, type DbBill } from '../services/household';
+import { fetchNotifications, markNotificationRead, markAllNotificationsRead, groupNotificationsByDate, type AppNotification } from '../services/notifications';
+
+import { type Palette } from '../theme';
 import type { Screen } from '../types';
 
-export function ActivityScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
+
+function PressRow({ onPress, style, children }: { onPress?: () => void; style?: object; children: ReactNode }) {
+  const s = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
+  return (
+    <AnimatedPressable
+      onPressIn={() => { s.value = withSpring(0.975, { damping: 16, stiffness: 320 }); }}
+      onPressOut={() => { s.value = withSpring(1, { damping: 12, stiffness: 260 }); }}
+      onPress={onPress}
+      style={[anim, style]}
+    >
+      {children}
+    </AnimatedPressable>
+  );
+}
+
+export function ActivityScreen({ go, t, c, householdId = '' }: { go: (s: Screen) => void; t: Copy; c: Palette; householdId?: string }) {
   const [filter, setFilter] = useState('All');
-  const items = [
-    ['M', 'orange', 'MERALCO', t.activity.markedPaid, 'Sep 2 · 9:41 AM', '₱2,450.36', 'Paid', 'Bills'],
-    ['W', 'blue', 'MAYNILAD', t.activity.billAdded, 'Sep 1 · 8:15 AM', '₱598.00', 'Upcoming', 'Bills'],
-    ['G', 'indigo', 'GLOBE', t.activity.reminderUpdated, 'Aug 30 · 7:22 PM', '₱599.00', 'Due soon', 'Load'],
-  ];
+  const [events, setEvents] = useState<DbActivityEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    if (!supabase || !householdId) { setLoading(false); return; }
+    void fetchHouseholdActivityEvents(householdId).then((data) => { setEvents(data); setLoading(false); });
+  }, [householdId]);
+
+  useRealtimeActivity(householdId, {
+    onInsert: (event) => setEvents((current) => [event as DbActivityEvent, ...current]),
+  });
+
+  const items = events.length > 0 ? events.map((evt) => {
+    const tone = String(evt.title).toLowerCase().includes('meralco') ? 'orange' : String(evt.title).toLowerCase().includes('maynilad') ? 'blue' : 'indigo';
+    const letter = (String(evt.title).match(/[A-Z]/)?.[0] || 'M');
+    const amount = evt.amount != null ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(Number(evt.amount)) : '—';
+    const eventType = String(evt.event_type).replace(/_/g, ' ');
+    const time = new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit' }).format(new Date(evt.created_at));
+    const category = String(evt.event_type).includes('paid') ? 'Bills' : 'Bills';
+    return [letter, tone, String(evt.title), eventType, time, amount, 'Paid', category] as unknown as [string, string, string, string, string, string, string, string];
+  }) : [];
+
   const visible = filter === 'All' ? items : items.filter((item) => item[7] === filter);
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.activity.title} onBack={() => go('home')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="bills" height={136} c={c} title={t.activity.title} subtitle="A clear record of your household’s bill activity." />
         <View style={{ flexDirection: 'row', gap: 7, marginBottom: 12 }}>
           {['All', 'Bills', 'Load', 'Lingkod'].map((item) => (
             <Pressable key={item} onPress={() => setFilter(item)} style={[styles.chip, { backgroundColor: filter === item ? c.primary : c.surface, borderColor: filter === item ? c.primary : c.border }]}>
-              <Text style={{ color: filter === item ? '#fff' : c.text, fontWeight: '700', fontSize: 12 }}>{item}</Text>
+              <Text style={{ color: filter === item ? c.onPrimary : c.text, fontWeight: '700', fontSize: 12 }}>{item}</Text>
             </Pressable>
           ))}
         </View>
-        <Text style={{ color: c.textMuted, fontSize: 12, marginBottom: 8 }}>September 2026</Text>
+        <Text style={{ color: c.textMuted, fontSize: 12, marginBottom: 8 }}>{new Intl.DateTimeFormat('en-PH', { month: 'long', year: 'numeric' }).format(new Date())}</Text>
         <Card c={c} style={{ paddingVertical: 0, paddingHorizontal: 14 }}>
           {visible.length ? visible.map((i) => (
-            <View key={i[2]} style={[styles.actRow, { borderBottomColor: c.border }]}>
+            <View key={i[2] + i[5]} style={[styles.actRow, { borderBottomColor: c.border }]}>
               <ProviderMark tone={i[1]} letter={i[0]} />
               <View style={{ flex: 1 }}>
                 <Text style={{ color: c.text, fontWeight: '800' }}>{i[2]}</Text>
@@ -63,10 +102,11 @@ export function LoadScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: 
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.load.title} c={c} trailing={<Pressable style={[styles.accent, { backgroundColor: c.primary }]}><Plus size={18} color="#fff" /></Pressable>} />
       <ScreenScroll withNav>
+        <CinematicHero pose="services" height={136} c={c} title={t.load.stay} subtitle={t.load.stayBody} />
         <Lead c={c} icon={<Smartphone size={20} color={c.primary} />} title={t.load.stay} body={t.load.stayBody} />
         <InfoBanner c={c}>{t.load.banner}</InfoBanner>
-        {loads.map((l) => (
-          <Pressable key={l.name} onPress={() => go('load-detail')} style={[styles.rowCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+          {loads.map((l) => (
+            <PressRow key={l.name} onPress={() => go('load-detail')} style={[styles.rowCard, { backgroundColor: c.surface, borderColor: c.border }]}>
             <ProviderMark tone={l.tone} letter={l.mark} />
             <View style={{ flex: 1 }}>
               <Text style={{ color: c.text, fontWeight: '800' }}>{l.name}</Text>
@@ -75,7 +115,7 @@ export function LoadScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: 
             <View><Text style={{ color: c.textMuted, fontSize: 10 }}>{t.load.next}</Text><Text style={{ color: c.text, fontWeight: '800' }}>{l.date}</Text></View>
             <View><Text style={{ color: c.textMuted, fontSize: 10 }}>{t.load.typical}</Text><Text style={{ color: c.text, fontWeight: '800' }}>{l.amount}</Text></View>
             <ChevronRight size={14} color={c.textMuted} />
-          </Pressable>
+          </PressRow>
         ))}
       </ScreenScroll>
       <BottomNav screen="load" go={go} c={c} t={t} />
@@ -88,6 +128,7 @@ export function LoadDetail({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: 
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.load.details} onBack={() => go('load')} c={c} trailing={<Pressable style={[styles.iconBtn, { backgroundColor: c.surface }]}><Pencil size={16} color={c.text} /></Pressable>} />
       <ScreenScroll>
+        <CinematicHero pose="services" height={132} c={c} title={t.load.details} subtitle="Keep your prepaid essentials on schedule." />
         <View style={[styles.hero, { backgroundColor: c.surface }]}>
           <ProviderMark tone="green" letter="S" size={46} />
           <View><Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>SMART</Text><Text style={{ color: c.textMuted }}>0919 ••• 4821 · Nanay</Text></View>
@@ -114,62 +155,104 @@ export function LoadDetail({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: 
   );
 }
 
-export function LingkodScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
+export function LingkodScreen({
+  go, t, c, householdId, onSelectGovernment,
+}: { go: (s: Screen) => void; t: Copy; c: Palette; householdId: string; onSelectGovernment: (government: GovernmentService) => void }) {
+  const [bills, setBills] = useState<DbBill[]>([]);
+  const load = () => { void fetchHouseholdBills(householdId).then(setBills); };
+  useEffect(() => { load(); }, [householdId]);
+  useRealtimeBills(householdId, { onInsert: load, onUpdate: load });
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <AppHeader title={t.lingkod.title} c={c} trailing={<Pressable style={[styles.accent, { backgroundColor: c.primary }]}><Plus size={18} color="#fff" /></Pressable>} />
+      <AppHeader title={t.lingkod.title} c={c} />
       <ScreenScroll withNav>
-        <Lead c={c} icon={<Landmark size={20} color="#42576B" />} title={t.lingkod.lead} body={t.lingkod.leadBody} gov />
+        <CinematicHero pose="government" height={168} c={c} title={t.lingkod.lead} subtitle={t.lingkod.leadBody} />
         <InfoBanner c={c}>{t.lingkod.banner}</InfoBanner>
-        {governmentItems.map((g) => (
-          <Pressable key={g.name} onPress={() => go('government-detail')} style={[styles.rowCard, { backgroundColor: c.surface, borderColor: c.border }]}>
-            <View style={styles.govMark}><Text style={{ color: '#fff', fontWeight: '800' }}>{g.mark}</Text></View>
+        <Text style={{ color: c.text, fontSize: 17, fontWeight: '800', marginBottom: 10 }}>Government bills</Text>
+        {governmentServices.map((government) => {
+          const bill = bills.find((item) => item.provider === government.name);
+          const display = bill ? formatBillDisplay(bill) : null;
+          return <PressRow key={government.id} onPress={() => onSelectGovernment(government)} style={[styles.rowCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={styles.govMark}><Text style={{ color: '#fff', fontWeight: '800' }}>{government.mark}</Text></View>
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontWeight: '800' }}>{g.name}</Text>
-              <Text style={{ color: c.textMuted, fontSize: 12 }}>{t.common.due} {g.due}</Text>
+              <Text style={{ color: c.text, fontWeight: '800', fontSize: 15 }}>{government.name}</Text>
+              <Text style={{ color: c.textMuted, fontSize: 13, marginTop: 2 }}>{display ? `${display.dueDateShort} · ${display.amount}` : 'Add your household bill'}</Text>
             </View>
-            <View style={{ alignItems: 'flex-end', gap: 4 }}>
-              <Text style={{ color: c.text, fontWeight: '800' }}>{g.amount}</Text>
-              <StatusPill status={g.status} c={c} />
-            </View>
+            {display ? <StatusPill status={display.status} c={c} /> : <Text style={{ color: c.primary, fontSize: 12, fontWeight: '800' }}>Add</Text>}
             <ChevronRight size={14} color={c.textMuted} />
-          </Pressable>
-        ))}
+          </PressRow>;
+        })}
       </ScreenScroll>
       <BottomNav screen="lingkod" go={go} c={c} t={t} />
     </View>
   );
 }
 
-export function GovernmentDetail({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
+export function GovernmentDetail({
+  go, t, c, userId, householdId, government,
+}: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string; government: GovernmentService }) {
+  const [bill, setBill] = useState<DbBill | null>(null);
+  const [account, setAccount] = useState('');
+  const [amount, setAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [saving, setSaving] = useState(false);
+  const [message, setMessage] = useState('');
+  const load = () => {
+    void fetchHouseholdBills(householdId).then((items) => setBill(items.find((item) => item.provider === government.name) ?? null));
+  };
+  useEffect(() => { load(); }, [householdId, government.id]);
+  const addBill = async () => {
+    if (!supabase || !householdId || !userId) return;
+    if (!amount.trim() || Number(amount) <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(dueDate)) { setMessage('Enter a valid amount and due date (YYYY-MM-DD).'); return; }
+    setSaving(true); setMessage('');
+    const { data, error } = await supabase.from('bills').insert({
+      user_id: userId, household_id: householdId, provider: government.name, category: 'Government', account_number: account.trim() || null,
+      alias: government.name, amount: Number(amount), due_date: dueDate, recurrence: 'monthly', reminder_days: 5, status: 'upcoming',
+    }).select('*').single();
+    if (error || !data) { setMessage(error?.message || 'Could not add this government bill.'); setSaving(false); return; }
+    await createBillActivityEvent(userId, householdId, data.id, 'government_bill_added', `${government.name} bill added`, Number(amount));
+    setBill(data as DbBill); setSaving(false);
+  };
+  const payBill = async () => {
+    if (!bill) return;
+    setSaving(true); setMessage('');
+    try {
+      await markBillPaid(bill.id, householdId, 'External payment', '', 'Household member');
+      await createBillActivityEvent(userId, householdId, bill.id, 'government_bill_paid', `${government.name} marked paid`, Number(bill.amount));
+      await load();
+    } catch (reason) { setMessage(reason instanceof Error ? reason.message : 'Could not mark this bill as paid.'); }
+    finally { setSaving(false); }
+  };
+  const display = bill ? formatBillDisplay(bill) : null;
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <AppHeader title={t.lingkod.details} onBack={() => go('lingkod')} c={c} trailing={<Pressable style={[styles.iconBtn, { backgroundColor: c.surface }]}><Pencil size={16} color={c.text} /></Pressable>} />
+      <AppHeader title={government.name} onBack={() => go('lingkod')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="government" height={142} c={c} title={government.name} subtitle={government.detail} />
         <View style={[styles.hero, { backgroundColor: c.surface }]}>
-          <View style={[styles.govMark, { width: 46, height: 46, borderRadius: 15 }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 18 }}>S</Text></View>
+          <View style={[styles.govMark, { width: 46, height: 46, borderRadius: 15 }]}><Text style={{ color: '#fff', fontWeight: '800', fontSize: 18 }}>{government.mark}</Text></View>
           <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>SSS Contribution</Text>
-            <Text style={{ color: c.textMuted }}>{t.lingkod.monthly}</Text>
+            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{government.name}</Text>
+            <Text style={{ color: c.textMuted }}>{government.detail}</Text>
           </View>
-          <StatusPill status="Upcoming" c={c} />
+          {display ? <StatusPill status={display.status} c={c} /> : null}
         </View>
-        <Card c={c}>
-          <Line c={c} label={t.lingkod.prepare} value="₱1,400" large />
-          <Line c={c} label={t.bills.due} value="Sep 10, 2026" />
-          <Line c={c} label={t.lingkod.reference} value="SS Number •••• 2814" last />
-        </Card>
-        <Card c={c} style={styles.between}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={[styles.soft, { backgroundColor: c.primarySoft }]}><Bell size={17} color={c.primary} /></View>
-            <View><Text style={{ color: c.text, fontWeight: '800' }}>{t.lingkod.deadline}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{t.lingkod.deadlineHint}</Text></View>
-          </View>
-          <Switch value trackColor={{ true: c.primary }} />
-        </Card>
-        <View style={{ gap: 9, marginTop: 16 }}>
-          <PrimaryButton title={t.lingkod.openOfficial} onPress={() => {}} c={c} />
-          <SecondaryButton title={t.lingkod.markDone} onPress={() => go('lingkod')} c={c} icon={<Check size={16} color={c.text} />} />
-        </View>
+        {message ? <InfoBanner c={c}>{message}</InfoBanner> : null}
+        {display ? <>
+          <Card c={c}>
+            <Line c={c} label={t.lingkod.prepare} value={display.amount} large />
+            <Line c={c} label={t.bills.due} value={display.due} />
+            <Line c={c} label={t.lingkod.reference} value={bill?.account_number ? `•••• ${String(bill.account_number).slice(-4)}` : 'No account reference'} last />
+          </Card>
+          {display.status.toLowerCase() !== 'paid' ? <View style={{ marginTop: 14 }}><PrimaryButton title={saving ? 'Saving…' : 'Mark as paid'} loading={saving} onPress={() => void payBill()} c={c} icon={<Check size={16} color="#fff" />} /></View> : <InfoBanner c={c}>This government bill has been marked paid.</InfoBanner>}
+        </> : <Card c={c} style={{ gap: 14 }}>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>Add your bill</Text>
+          <Text style={{ color: c.textMuted, fontSize: 13, lineHeight: 19 }}>Only your household’s own {government.name} bill is saved here.</Text>
+          <Field c={c} label="Account or reference number" value={account} onChangeText={setAccount} placeholder="Optional" autoCapitalize="characters" />
+          <Field c={c} label="Amount" value={amount} onChangeText={setAmount} placeholder="0.00" keyboardType="decimal-pad" />
+          <Field c={c} label="Due date" value={dueDate} onChangeText={setDueDate} placeholder="YYYY-MM-DD" autoCapitalize="none" />
+          <PrimaryButton title={saving ? 'Adding bill…' : 'Add government bill'} loading={saving} onPress={() => void addBill()} c={c} icon={<Check size={16} color="#fff" />} />
+        </Card>}
         <View style={{ flexDirection: 'row', gap: 7, marginTop: 12 }}>
           <ShieldCheck size={13} color={c.primary} />
           <Text style={{ color: c.textMuted, fontSize: 12, flex: 1 }}>{t.lingkod.legal}</Text>
@@ -179,88 +262,74 @@ export function GovernmentDetail({ go, t, c }: { go: (s: Screen) => void; t: Cop
   );
 }
 
-export function NotificationsScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
-  const [unread, setUnread] = useState(true);
+export function NotificationsScreen({ go, t, c, userId = '' }: { go: (s: Screen) => void; t: Copy; c: Palette; userId?: string }) {
+  const [notifications, setNotifications] = useState<AppNotification[]>([]);
+  const [unread, setUnread] = useState(false);
+
+  useEffect(() => {
+    if (!supabase || !userId) return;
+    void fetchNotifications(userId).then((data) => {
+      setNotifications(data);
+      setUnread(data.some((n) => !n.read));
+    });
+  }, [userId]);
+
+  useRealtimeNotifications(userId, {
+    onInsert: (notification) => {
+      setNotifications((current) => [notification as AppNotification, ...current]);
+      if (!(notification as AppNotification).read) setUnread(true);
+    },
+    onUpdate: () => {
+      void fetchNotifications(userId).then((data) => {
+        setNotifications(data);
+        setUnread(data.some((n) => !n.read));
+      });
+    },
+  });
+
+  const markAll = () => {
+    if (!supabase || !userId) { setUnread(false); return; }
+    void markAllNotificationsRead(userId);
+    setNotifications((current) => current.map((n) => ({ ...n, read: true })));
+    setUnread(false);
+  };
+
+  const open = (n: AppNotification) => {
+    if (n.bill_id) go('bill-detail');
+    else if (n.type === 'government') go('government-detail');
+    else go('bill-detail');
+    void markNotificationRead(n.id);
+    setNotifications((current) => current.map((item) => item.id === n.id ? { ...item, read: true } : item));
+    setUnread(notifications.some((x) => !x.read));
+  };
+
+  const groups = groupNotificationsByDate(notifications);
+
+  const displayGroups = notifications.length > 0 ? groups : [];
+  const displayUnread = unread;
+
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.notifications.title} onBack={() => go('home')} c={c} trailing={
-        <Pressable onPress={() => setUnread(false)}><Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>{unread ? t.notifications.markRead : t.notifications.allRead}</Text></Pressable>
+        <Pressable onPress={markAll}><Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>{displayUnread ? t.notifications.markRead : t.notifications.allRead}</Text></Pressable>
       } />
       <ScreenScroll>
-        <Text style={styles.group}>{t.notifications.today}</Text>
-        <Note c={c} unread={unread} icon={<Clock3 size={16} color={c.warning} />} tone="amber" title={t.notifications.meralco} body="₱2,450.36 · Sep 8" time="9:00 AM" onPress={() => { setUnread(false); go('bill-detail'); }} />
-        <Note c={c} unread={unread} icon={<Landmark size={16} color={c.primary} />} tone="green" title={t.notifications.sss} body={t.notifications.sssBody} time="8:30 AM" onPress={() => { setUnread(false); go('government-detail'); }} />
-        <Text style={styles.group}>{t.notifications.yesterday}</Text>
-        <Note c={c} icon={<Smartphone size={16} color={c.textMuted} />} tone="neutral" title={t.notifications.globe} body="₱99" time="Sep 1" onPress={() => go('load-detail')} />
-      </ScreenScroll>
-    </View>
-  );
-}
-
-export function StoryScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
-  const videoRef = useRef<Video>(null);
-  const [playing, setPlaying] = useState(true);
-  const toggle = async () => {
-    const video = videoRef.current;
-    if (!video) return;
-    const status = await video.getStatusAsync();
-    if (status.isLoaded && status.isPlaying) { await video.pauseAsync(); setPlaying(false); }
-    else { await video.playAsync(); setPlaying(true); }
-  };
-  return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <AppHeader title={t.story.title} onBack={() => go('home')} c={c} trailing={
-        <Pressable onPress={() => void toggle()} style={[styles.accent, { backgroundColor: c.primary }]}>
-          {playing ? <Pause size={16} color="#fff" /> : <Play size={16} color="#fff" />}
-        </Pressable>
-      } />
-      <ScreenScroll withNav>
-        <View style={styles.stage}>
-          <Video ref={videoRef} source={storyVideo} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted />
-          <LinearGradient colors={['rgba(4,13,70,0.08)', 'rgba(4,8,37,0.94)']} style={StyleSheet.absoluteFill} />
-          <View style={{ position: 'absolute', left: 18, top: 18 }}><BrandLogo inverted compact /></View>
-          <View style={styles.storyCopy}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 5 }}>
-              <Sparkles size={12} color="#D8DCFF" />
-              <Text style={{ color: '#D8DCFF', fontSize: 11, fontWeight: '800', letterSpacing: 0.8 }}>{t.story.kicker}</Text>
-            </View>
-            <Text style={styles.storyH}>{t.story.headline}</Text>
-            <Text style={{ color: '#DCE1FF', fontSize: 13, lineHeight: 19 }}>{t.story.body}</Text>
-            <Pressable onPress={() => void toggle()} style={styles.filmBtn}>
-              {playing ? <Pause size={12} color="#fff" /> : <Play size={12} color="#fff" />}
-              <Text style={{ color: '#fff', fontWeight: '800', fontSize: 12 }}>{playing ? t.story.pause : t.story.play}</Text>
-            </Pressable>
+        <CinematicHero pose="calendar" height={136} c={c} title={t.notifications.title} subtitle="Your household reminders, all in one place." />
+        {displayGroups.map((group) => (
+          <View key={group.label}>
+            <Text style={[styles.group, { color: c.textMuted }]}>{group.label}</Text>
+            {group.items.map((n) => {
+              const isDue = n.type === 'due_reminder';
+              const icon = isDue ? <Clock3 size={16} color={c.warning} /> : <Bell size={16} color={c.primary} />;
+              const tone = isDue ? 'amber' : 'green';
+              const time = new Intl.DateTimeFormat('en-PH', { hour: 'numeric', minute: '2-digit' }).format(new Date(n.created_at));
+              return (
+                <Note key={n.id} c={c} unread={!n.read} icon={icon} tone={tone} title={n.title} body={n.body} time={time} onPress={() => open(n)} />
+              );
+            })}
           </View>
-        </View>
-        <View style={styles.metrics}>
-          {[['1', t.story.metric1], ['3d', t.story.metric2], ['0', t.story.metric3]].map(([n, l]) => (
-            <View key={l} style={[styles.metric, { backgroundColor: c.surface }]}>
-              <Text style={{ color: c.primary, fontSize: 20, fontWeight: '800' }}>{n}</Text>
-              <Text style={{ color: c.textMuted, fontSize: 11, textAlign: 'center' }}>{l}</Text>
-            </View>
-          ))}
-        </View>
-        <Card c={c}>
-          <Text style={{ color: c.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1.2 }}>{t.story.board}</Text>
-          <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginVertical: 8 }}>{t.story.boardTitle}</Text>
-          {[[t.story.s1, t.story.s1b], [t.story.s2, t.story.s2b], [t.story.s3, t.story.s3b]].map(([title, body], i) => (
-            <View key={title} style={[styles.scene, { borderTopColor: c.border }]}>
-              <View style={styles.sceneNum}><Text style={{ color: c.primary, fontWeight: '800', fontSize: 11 }}>0{i + 1}</Text></View>
-              <View><Text style={{ color: c.text, fontWeight: '800' }}>{title}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{body}</Text></View>
-            </View>
-          ))}
-        </Card>
-        <LinearGradient colors={[...gradient.hero]} style={styles.cta}>
-          <Image source={images.onboarding} style={styles.ctaImg} />
-          <Text style={{ color: '#CBD4FF', fontSize: 10, letterSpacing: 1.2 }}>{t.story.ready}</Text>
-          <Text style={{ color: '#fff', fontSize: 18, fontWeight: '800', marginVertical: 8, width: '68%' }}>{t.story.cta}</Text>
-          <Pressable onPress={() => go('onboarding')} style={styles.ctaBtn}>
-            <Text style={{ color: '#2E42C9', fontWeight: '800' }}>{t.story.start}</Text>
-            <ChevronRight size={14} color="#2E42C9" />
-          </Pressable>
-        </LinearGradient>
+        ))}
       </ScreenScroll>
-      <BottomNav screen="story" go={go} c={c} t={t} />
     </View>
   );
 }
@@ -289,10 +358,10 @@ export function StateScreen({ kind, go, t, c }: { kind: 'offline' | 'empty' | 'e
 function Lead({ c, icon, title, body, gov }: { c: Palette; icon: ReactNode; title: string; body: string; gov?: boolean }) {
   return (
     <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', paddingBottom: 14 }}>
-      <View style={[styles.soft, { width: 44, height: 44, borderRadius: 14, backgroundColor: gov ? '#EDF0F3' : c.primarySoft }]}>{icon}</View>
+      <View style={[styles.soft, { width: 44, height: 44, borderRadius: 14, backgroundColor: gov ? c.surface2 : c.primarySoft }]}>{icon}</View>
       <View style={{ flex: 1 }}>
-        <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>{title}</Text>
-        <Text style={{ color: c.textMuted, fontSize: 12 }}>{body}</Text>
+        <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>{title}</Text>
+        <Text style={{ color: c.textMuted, fontSize: 13, lineHeight: 18, marginTop: 2 }}>{body}</Text>
       </View>
     </View>
   );
@@ -309,8 +378,15 @@ function Line({ c, label, value, large, last }: { c: Palette; label: string; val
 
 function Note({ c, unread, icon, tone, title, body, time, onPress }: { c: Palette; unread?: boolean; icon: ReactNode; tone: string; title: string; body: string; time: string; onPress: () => void }) {
   const bg = tone === 'amber' ? c.warningSoft : tone === 'green' ? c.primarySoft : c.surface2;
+  const s = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
-    <Pressable onPress={onPress} style={[styles.note, { backgroundColor: unread ? c.primarySoft : c.surface, borderBottomColor: c.border }]}>
+    <AnimatedPressable
+      onPressIn={() => { s.value = withSpring(0.985, { damping: 16, stiffness: 320 }); }}
+      onPressOut={() => { s.value = withSpring(1, { damping: 12, stiffness: 260 }); }}
+      onPress={onPress}
+      style={[styles.note, { backgroundColor: unread ? c.primarySoft : c.surface, borderBottomColor: c.border }, anim]}
+    >
       <View style={[styles.noteIcon, { backgroundColor: bg }]}>{icon}</View>
       <View style={{ flex: 1 }}>
         <Text style={{ color: c.text, fontWeight: '800' }}>{title}</Text>
@@ -318,7 +394,7 @@ function Note({ c, unread, icon, tone, title, body, time, onPress }: { c: Palett
         <Text style={{ color: c.textMuted, fontSize: 11, marginTop: 2 }}>{time}</Text>
       </View>
       {unread && <View style={[styles.unread, { backgroundColor: c.primary }]} />}
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
@@ -332,7 +408,8 @@ const styles = StyleSheet.create({
   between: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
   soft: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   govMark: { width: 35, height: 35, borderRadius: 11, backgroundColor: '#42576B', alignItems: 'center', justifyContent: 'center' },
-  group: { fontSize: 13, fontWeight: '700', marginTop: 12, marginBottom: 8, color: '#6B7190' },
+  emptyState: { alignItems: 'center', paddingVertical: 30 },
+  group: { fontSize: 13, fontWeight: '700', marginTop: 12, marginBottom: 8 },
   note: { flexDirection: 'row', alignItems: 'flex-start', gap: 11, padding: 13, borderBottomWidth: StyleSheet.hairlineWidth },
   noteIcon: { width: 35, height: 35, borderRadius: 11, alignItems: 'center', justifyContent: 'center' },
   unread: { width: 6, height: 6, borderRadius: 3, marginTop: 6 },
@@ -343,7 +420,7 @@ const styles = StyleSheet.create({
   metrics: { flexDirection: 'row', gap: 7, marginVertical: 13 },
   metric: { flex: 1, padding: 12, borderRadius: 14, alignItems: 'center' },
   scene: { flexDirection: 'row', gap: 10, paddingVertical: 12, borderTopWidth: StyleSheet.hairlineWidth },
-  sceneNum: { width: 30, height: 30, borderRadius: 10, backgroundColor: '#EDF1FF', alignItems: 'center', justifyContent: 'center' },
+  sceneNum: { width: 30, height: 30, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   cta: { minHeight: 170, marginVertical: 13, borderRadius: 20, overflow: 'hidden', padding: 18, justifyContent: 'center' },
   ctaImg: { position: 'absolute', width: 200, height: 180, right: -56, bottom: -31, opacity: 0.55 },
   ctaBtn: { alignSelf: 'flex-start', backgroundColor: '#fff', height: 37, paddingHorizontal: 14, borderRadius: 12, flexDirection: 'row', alignItems: 'center', gap: 4 },

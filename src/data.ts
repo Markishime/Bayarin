@@ -1,13 +1,17 @@
-import type { Bill, HouseholdMember } from './types';
-
-export const DEMO_EMAIL = process.env.EXPO_PUBLIC_DEMO_EMAIL ?? '';
-export const DEMO_PASSWORD = process.env.EXPO_PUBLIC_DEMO_PASSWORD ?? '';
-export const isDemoConfigured = Boolean(DEMO_EMAIL && DEMO_PASSWORD);
-
 export const images = {
+  welcome: require('../assets/welcome-hero-v2.png'),
   story: require('../assets/bayarin-story-3d.png'),
   onboarding: require('../assets/bayarin-onboarding-3d.png'),
-  auth: require('../assets/bayarin-auth-3d.png'),
+  auth: require('../assets/bayarin-auth-hero.jpg'),
+  avatar: require('../assets/bayarin-avatar-v1.png'),
+  mainAvatar: require('../assets/bayarin-main-avatar.png'),
+  homeHero: require('../assets/bayarin-home-hero.jpg'),
+  profileHero: require('../assets/bayarin-profile-hero.jpg'),
+  servicesHero: require('../assets/bayarin-services-hero-v2.jpg'),
+  calendarHero: require('../assets/bayarin-calendar-hero.png'),
+  calendarHeroV2: require('../assets/bayarin-calendar-hero-v3.jpg'),
+  billsHero: require('../assets/bayarin-bills-hero-v2.jpg'),
+  lingkodHero: require('../assets/bayarin-lingkod-hero-v2.jpg'),
 };
 
 export const storyVideo = require('../assets/bayarin-story.mp4');
@@ -30,16 +34,85 @@ export const serviceIds = [
   'other',
 ] as const;
 
-export const bills: Bill[] = [
-  { provider: 'MERALCO', category: 'Electricity', account: '9012', due: 'Sep 8, 2026', amount: '₱2,450.36', status: 'Due soon', tone: 'orange' },
-  { provider: 'MAYNILAD', category: 'Water', account: '3381', due: 'Sep 12, 2026', amount: '₱598.00', status: 'Upcoming', tone: 'blue' },
-  { provider: 'GLOBE', category: 'Internet', account: '7740', due: 'Sep 16, 2026', amount: '₱599.00', status: 'Upcoming', tone: 'indigo' },
-  { provider: 'PLDT', category: 'Internet', account: '2710', due: 'Aug 31, 2026', amount: '₱1,699.00', status: 'Overdue', tone: 'red' },
-];
+export type ServiceId = typeof serviceIds[number];
 
-export const demoMembers: HouseholdMember[] = [
-  { id: 'demo-1', name: 'Juan Dela Cruz', role: 'Organizer', contact: 'You' },
-  { id: 'demo-2', name: 'Maria Dela Cruz', role: 'Household member', contact: 'maria@email.com' },
+export type ServiceProvider = {
+  id: string;
+  name: string;
+  mark: string;
+  tone: string;
+  detail: string;
+};
+
+export type BillService = {
+  id: Exclude<ServiceId, 'government'>;
+  name: string;
+  detail: string;
+  providers: ServiceProvider[];
+};
+
+const provider = (id: string, name: string, mark: string, tone: string, detail: string): ServiceProvider => ({ id, name, mark, tone, detail });
+
+// A practical national directory with an Other option for local providers.
+export const billServices: Record<Exclude<ServiceId, 'government'>, BillService> = {
+  electricity: { id: 'electricity', name: 'Electricity', detail: 'Choose your electric utility', providers: [
+    provider('meralco', 'Meralco', 'M', 'orange', 'Metro Manila and nearby areas'),
+    provider('veco', 'VECO', 'V', 'indigo', 'Visayan Electric Company'),
+    provider('davao-light', 'Davao Light', 'D', 'blue', 'Davao electric utility'),
+    provider('batelec', 'BATELEC', 'B', 'green', 'Batangas electric cooperative'),
+    provider('electricity-other', 'Other electricity provider', '+', 'slate', 'Add your local utility'),
+  ] },
+  water: { id: 'water', name: 'Water', detail: 'Choose your water utility', providers: [
+    provider('lwua', 'LWUA / local water district', 'L', 'blue', 'Local Water Utilities Administration'),
+    provider('maynilad', 'Maynilad', 'M', 'blue', 'West Zone water utility'),
+    provider('manila-water', 'Manila Water', 'W', 'indigo', 'East Zone water utility'),
+    provider('mcwd', 'Metro Cebu Water District', 'C', 'blue', 'Cebu water utility'),
+    provider('primewater', 'PrimeWater', 'P', 'green', 'Local water utility'),
+    provider('water-other', 'Other water provider', '+', 'slate', 'Add your local water utility'),
+  ] },
+  internet: { id: 'internet', name: 'Internet', detail: 'Choose your home internet provider', providers: [
+    provider('pldt', 'PLDT Home', 'P', 'red', 'Fiber and broadband'),
+    provider('globe', 'Globe At Home', 'G', 'indigo', 'Fiber and broadband'),
+    provider('converge', 'Converge', 'C', 'orange', 'Fiber internet'),
+    provider('sky', 'SKY Fiber', 'S', 'blue', 'Fiber and cable internet'),
+    provider('internet-other', 'Other internet provider', '+', 'slate', 'Add your local provider'),
+  ] },
+  cable: { id: 'cable', name: 'Cable & streaming', detail: 'Choose your TV provider', providers: [
+    provider('cignal', 'Cignal', 'C', 'blue', 'Satellite television'),
+    provider('sky-cable', 'SKY Cable', 'S', 'orange', 'Cable television'),
+    provider('gsat', 'GSAT', 'G', 'red', 'Satellite television'),
+    provider('cable-other', 'Other TV provider', '+', 'slate', 'Add your provider'),
+  ] },
+  load: { id: 'load', name: 'Mobile load', detail: 'Choose your mobile network', providers: [
+    provider('smart', 'Smart', 'S', 'green', 'Prepaid and postpaid'),
+    provider('globe-mobile', 'Globe', 'G', 'indigo', 'Prepaid and postpaid'),
+    provider('dito', 'DITO', 'D', 'red', 'Prepaid and postpaid'),
+    provider('tm', 'TM', 'T', 'blue', 'Prepaid mobile'),
+  ] },
+  insurance: { id: 'insurance', name: 'Insurance', detail: 'Choose your insurance provider', providers: [
+    provider('axa', 'AXA Philippines', 'A', 'indigo', 'Life and health insurance'),
+    provider('sun-life', 'Sun Life', 'S', 'orange', 'Life insurance'),
+    provider('pru-life', 'Pru Life UK', 'P', 'red', 'Life insurance'),
+    provider('insurance-other', 'Other insurer', '+', 'slate', 'Add your insurer'),
+  ] },
+  other: { id: 'other', name: 'Other bill', detail: 'Choose or add a provider', providers: [
+    provider('other-provider', 'Other provider', '+', 'slate', 'Add any household bill'),
+  ] },
+};
+
+export type GovernmentService = {
+  id: string;
+  name: string;
+  mark: string;
+  detail: string;
+};
+
+export const governmentServices: GovernmentService[] = [
+  { id: 'sss', name: 'SSS Contribution', mark: 'S', detail: 'Social Security System' },
+  { id: 'philhealth', name: 'PhilHealth Contribution', mark: 'P', detail: 'Philippine Health Insurance' },
+  { id: 'pagibig', name: 'Pag-IBIG Contribution', mark: 'H', detail: 'Home Development Mutual Fund' },
+  { id: 'bir', name: 'BIR Tax Payment', mark: 'B', detail: 'Bureau of Internal Revenue' },
+  { id: 'lto', name: 'LTO Registration', mark: 'L', detail: 'Land Transportation Office' },
 ];
 
 export const loads = [
@@ -48,19 +121,12 @@ export const loads = [
   { mark: 'D', tone: 'red', name: 'DITO', number: '0991 ••• 1830', date: 'Sep 20', amount: '₱199' },
 ];
 
-export const governmentItems = [
-  { mark: 'S', name: 'SSS Contribution', due: 'Sep 10', amount: '₱1,400', status: 'Upcoming' },
-  { mark: 'P', name: 'PhilHealth', due: 'Sep 18', amount: '₱500', status: 'Upcoming' },
-  { mark: 'L', name: 'LTO Registration', due: 'Oct 4', amount: '₱2,100', status: 'Draft' },
-];
-
 export const defaultOnboarding = {
   services: ['electricity', 'water', 'internet', 'load'],
   dueSoon: true,
   weeklySummary: true,
   loadReminders: true,
   lingkodDeadlines: true,
-  householdName: 'Dela Cruz Household',
 };
 
 export function langToStored(lang: 'en' | 'tl' | 'ceb') {

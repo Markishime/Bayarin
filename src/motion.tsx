@@ -1,7 +1,7 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import type { ReactNode } from 'react';
 import { useEffect } from 'react';
-import { Image, Pressable, StyleSheet, type ImageSourcePropType, type ViewStyle } from 'react-native';
+import { Image, Pressable, StyleSheet, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
   FadeInDown,
@@ -9,7 +9,9 @@ import Animated, {
   interpolate,
   useAnimatedStyle,
   useSharedValue,
+  withDelay,
   withRepeat,
+  withSequence,
   withSpring,
   withTiming,
   ZoomIn,
@@ -31,7 +33,7 @@ export function ScreenTransition({ id, children }: { id: string; children: React
 
 export function Float3D({
   children, delay = 0, intensity = 1, style,
-}: { children: ReactNode; delay?: number; intensity?: number; style?: ViewStyle }) {
+}: { children: ReactNode; delay?: number; intensity?: number; style?: StyleProp<ViewStyle> }) {
   const t = useSharedValue(0);
   useEffect(() => {
     const timeout = setTimeout(() => {
@@ -139,6 +141,92 @@ export function Stagger({ index, children, style }: { index: number; children: R
 
 export function PopIn({ children }: { children: ReactNode }) {
   return <Animated.View entering={ZoomIn.springify().damping(14)}>{children}</Animated.View>;
+}
+
+/* ── new primitives ── */
+
+export function Shake({ children, trigger, style }: {
+  children: ReactNode; trigger: number; style?: ViewStyle;
+}) {
+  const x = useSharedValue(0);
+  useEffect(() => {
+    if (trigger === 0) return;
+    x.value = withSequence(
+      withTiming(-10, { duration: 50, easing: Easing.out(Easing.quad) }),
+      withTiming(10, { duration: 50 }),
+      withTiming(-6, { duration: 50 }),
+      withTiming(6, { duration: 50 }),
+      withTiming(0, { duration: 60, easing: Easing.out(Easing.quad) }),
+    );
+  }, [trigger, x]);
+  const anim = useAnimatedStyle(() => ({
+    transform: [{ translateX: x.value }],
+  }));
+  return <Animated.View style={[anim, style]}>{children}</Animated.View>;
+}
+
+export function FadeScale({ children, delay = 0, style }: {
+  children: ReactNode; delay?: number; style?: ViewStyle;
+}) {
+  const opacity = useSharedValue(0);
+  const scale = useSharedValue(0.92);
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      opacity.value = withTiming(1, { duration: 420, easing: Easing.out(Easing.quad) });
+      scale.value = withSpring(1, { damping: 16, stiffness: 180 });
+    }, delay);
+    return () => clearTimeout(timeout);
+  }, [delay, opacity, scale]);
+  const anim = useAnimatedStyle(() => ({
+    opacity: opacity.value,
+    transform: [{ scale: scale.value }],
+  }));
+  return <Animated.View style={[anim, style]}>{children}</Animated.View>;
+}
+
+export function GlowPulse({ children, color = 'rgba(47,70,232,0.35)', size = 8, style }: {
+  children: ReactNode; color?: string; size?: number; style?: ViewStyle;
+}) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 2400, easing: ease }), -1, true);
+  }, [t]);
+  const anim = useAnimatedStyle(() => ({
+    shadowOpacity: interpolate(t.value, [0, 1], [0.15, 0.4]),
+    shadowRadius: interpolate(t.value, [0, 1], [size * 0.6, size * 1.4]),
+  }));
+  return (
+    <Animated.View style={[{ shadowColor: color, shadowOffset: { width: 0, height: 0 } }, anim, style]}>
+      {children}
+    </Animated.View>
+  );
+}
+
+export function Entrance({ index, children, style }: {
+  index: number; children: ReactNode; style?: ViewStyle;
+}) {
+  return (
+    <Animated.View
+      entering={FadeInUp.delay(index * 80 + 100).springify().damping(14).stiffness(120)}
+      style={style}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+export function HeroFloat({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+  const t = useSharedValue(0);
+  useEffect(() => {
+    t.value = withRepeat(withTiming(1, { duration: 3800, easing: ease }), -1, true);
+  }, [t]);
+  const anim = useAnimatedStyle(() => ({
+    transform: [
+      { translateY: interpolate(t.value, [0, 1], [-6, 6]) },
+      { scale: interpolate(t.value, [0, 1], [1, 1.02]) },
+    ],
+  }));
+  return <Animated.View style={[anim, style]}>{children}</Animated.View>;
 }
 
 const styles = StyleSheet.create({

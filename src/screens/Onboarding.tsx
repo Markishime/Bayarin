@@ -1,32 +1,19 @@
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ArrowLeft, Bell, CalendarDays, Check, ChevronRight, Landmark, Moon, ShieldCheck,
-  Smartphone, Sun, Users, Zap,
+  ArrowLeft, Check, ChevronRight, Moon, Sun,
 } from 'lucide-react-native';
-import { useMemo, useState } from 'react';
-import { Image, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
+import { useState } from 'react';
+import { Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { PrefSwitch, PrimaryButton } from '../components/ui';
-import { images, serviceIds } from '../data';
+import { serviceIds } from '../data';
 import { languageOptions, type Copy } from '../i18n';
-import { useLayout } from '../layout';
-import { Float3D, OrbitOrb, SceneArt, ScreenTransition } from '../motion';
+import { ScreenTransition } from '../motion';
 import { gradient, type Palette } from '../theme';
 import type { Lang, OnboardingDraft, Screen } from '../types';
 
-const FEATURE_STEPS = ['intro', 'bills', 'reminders', 'load', 'lingkod', 'household', 'privacy'] as const;
-const ALL_STEPS = ['language', ...FEATURE_STEPS, 'services', 'notifications', 'theme', 'home', 'ready'] as const;
+const ALL_STEPS = ['language', 'services', 'notifications', 'theme', 'ready'] as const;
 type Step = (typeof ALL_STEPS)[number];
-
-const featureMeta: Record<(typeof FEATURE_STEPS)[number], { Icon: typeof CalendarDays; imageShift?: object }> = {
-  intro: { Icon: CalendarDays },
-  bills: { Icon: CalendarDays },
-  reminders: { Icon: Bell },
-  load: { Icon: Smartphone },
-  lingkod: { Icon: Landmark },
-  household: { Icon: Users },
-  privacy: { Icon: ShieldCheck },
-};
 
 export function OnboardingScreen({
   go, finish, t, c, lang, setLang, dark, setDark, draft, setDraft,
@@ -43,7 +30,6 @@ export function OnboardingScreen({
   setDraft: (next: OnboardingDraft) => void;
 }) {
   const insets = useSafeAreaInsets();
-  const layout = useLayout();
   const [step, setStep] = useState<Step>('language');
   const index = ALL_STEPS.indexOf(step);
   const last = ALL_STEPS.length - 1;
@@ -57,17 +43,7 @@ export function OnboardingScreen({
     else setStep(ALL_STEPS[index - 1]);
   };
 
-  const featureCopy = useMemo(() => ({
-    intro: { eyebrow: t.onboarding.introEyebrow, title: t.onboarding.introTitle, body: t.onboarding.introBody, chip: t.welcome.featureOrg },
-    bills: { eyebrow: t.onboarding.billsEyebrow, title: t.onboarding.billsTitle, body: t.onboarding.billsBody, chip: t.onboarding.billsChip },
-    reminders: { eyebrow: t.onboarding.remindersEyebrow, title: t.onboarding.remindersTitle, body: t.onboarding.remindersBody, chip: t.onboarding.remindersChip },
-    load: { eyebrow: t.onboarding.loadEyebrow, title: t.onboarding.loadTitle, body: t.onboarding.loadBody, chip: t.onboarding.loadChip },
-    lingkod: { eyebrow: t.onboarding.lingkodEyebrow, title: t.onboarding.lingkodTitle, body: t.onboarding.lingkodBody, chip: t.onboarding.lingkodChip },
-    household: { eyebrow: t.onboarding.householdEyebrow, title: t.onboarding.householdTitle, body: t.onboarding.householdBody, chip: t.onboarding.householdChip },
-    privacy: { eyebrow: t.onboarding.privacyEyebrow, title: t.onboarding.privacyTitle, body: t.onboarding.privacyBody, chip: t.onboarding.privacyChip },
-  }), [t]);
-
-  const cta = step === 'ready' ? t.onboarding.readyCta : step === 'language' ? t.onboarding.continue : t.onboarding.continue;
+  const cta = step === 'ready' ? t.onboarding.readyCta : t.onboarding.continue;
 
   return (
     <View style={[styles.root, { backgroundColor: c.bg, paddingTop: insets.top + 6 }]}>
@@ -119,44 +95,6 @@ export function OnboardingScreen({
           </View>
         )}
 
-        {(FEATURE_STEPS as readonly string[]).includes(step) && (
-          <View style={{ flex: 1 }}>
-            <View style={[styles.visualWrap, { height: layout.heroH, marginHorizontal: layout.pad }]}>
-              <OrbitOrb size={90} color="rgba(111,140,255,0.45)" radiusX={70} radiusY={40} duration={8000} />
-              <SceneArt source={images.onboarding} height={layout.heroH} />
-              <View style={styles.focus}>
-                {(() => {
-                  const Icon = featureMeta[step as (typeof FEATURE_STEPS)[number]].Icon;
-                  return <Icon size={22} color="#3449D9" />;
-                })()}
-              </View>
-              <Float3D intensity={0.9} style={styles.floatCard}>
-                {step === 'bills' || step === 'intro' ? <Zap size={16} color="#293FBD" /> :
-                  step === 'reminders' ? <Bell size={16} color="#293FBD" /> :
-                  step === 'load' ? <Smartphone size={16} color="#293FBD" /> :
-                  step === 'lingkod' ? <Landmark size={16} color="#293FBD" /> :
-                  step === 'household' ? <Users size={16} color="#293FBD" /> :
-                  <ShieldCheck size={16} color="#293FBD" />}
-                <Text style={styles.floatText}>{featureCopy[step as (typeof FEATURE_STEPS)[number]].chip}</Text>
-              </Float3D>
-            </View>
-            <View style={styles.pad}>
-              <Text style={[styles.eyebrow, { color: c.primary }]}>{featureCopy[step as (typeof FEATURE_STEPS)[number]].eyebrow}</Text>
-              <Text style={[styles.h1, { color: c.text }]}>{featureCopy[step as (typeof FEATURE_STEPS)[number]].title}</Text>
-              <Text style={[styles.bodyText, { color: c.textMuted }]}>{featureCopy[step as (typeof FEATURE_STEPS)[number]].body}</Text>
-              {step === 'privacy' && (
-                <View style={[styles.note, { backgroundColor: c.primarySoft }]}>
-                  <ShieldCheck size={20} color={c.primary} />
-                  <View style={{ flex: 1 }}>
-                    <Text style={{ color: c.primary, fontWeight: '800', fontSize: 13 }}>{t.onboarding.privacyNoteTitle}</Text>
-                    <Text style={{ color: c.primary, fontSize: 11, marginTop: 2 }}>{t.onboarding.privacyNoteBody}</Text>
-                  </View>
-                </View>
-              )}
-            </View>
-          </View>
-        )}
-
         {step === 'services' && (
           <View style={styles.pad}>
             <Text style={[styles.eyebrow, { color: c.primary }]}>{t.onboarding.servicesEyebrow}</Text>
@@ -200,7 +138,7 @@ export function OnboardingScreen({
             <Text style={[styles.bodyText, { color: c.textMuted }]}>{t.onboarding.themeBody}</Text>
             <View style={styles.themeRow}>
               <Pressable onPress={() => setDark(false)} style={[styles.themeCard, { borderColor: !dark ? c.primary : c.border, backgroundColor: c.surface }]}>
-                <View style={[styles.themePreview, { backgroundColor: '#F7F4EF' }]}>
+                <View style={[styles.themePreview, { backgroundColor: '#EEF1F7' }]}>
                   <LinearGradient colors={[...gradient.hero]} style={styles.themeBar} />
                   <View style={styles.themeLine} />
                   <View style={[styles.themeLine, { width: '65%' }]} />
@@ -208,10 +146,10 @@ export function OnboardingScreen({
                 <View style={styles.themeLabel}><Sun size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.onboarding.themeLight}</Text></View>
               </Pressable>
               <Pressable onPress={() => setDark(true)} style={[styles.themeCard, { borderColor: dark ? c.primary : c.border, backgroundColor: c.surface }]}>
-                <View style={[styles.themePreview, { backgroundColor: '#151412' }]}>
+                <View style={[styles.themePreview, { backgroundColor: '#12182A' }]}>
                   <LinearGradient colors={[...gradient.hero]} style={styles.themeBar} />
-                  <View style={[styles.themeLine, { backgroundColor: '#272522' }]} />
-                  <View style={[styles.themeLine, { width: '65%', backgroundColor: '#272522' }]} />
+                  <View style={[styles.themeLine, { backgroundColor: '#263352' }]} />
+                  <View style={[styles.themeLine, { width: '65%', backgroundColor: '#263352' }]} />
                 </View>
                 <View style={styles.themeLabel}><Moon size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.onboarding.themeDark}</Text></View>
               </Pressable>
@@ -219,28 +157,9 @@ export function OnboardingScreen({
           </View>
         )}
 
-        {step === 'home' && (
-          <View style={styles.pad}>
-            <Text style={[styles.eyebrow, { color: c.primary }]}>{t.onboarding.homeEyebrow}</Text>
-            <Text style={[styles.h1, { color: c.text }]}>{t.onboarding.homeTitle}</Text>
-            <Text style={[styles.bodyText, { color: c.textMuted }]}>{t.onboarding.homeBody}</Text>
-            <View style={[styles.inputWrap, { backgroundColor: c.surface, borderColor: c.border }]}>
-              <Users size={18} color={c.primary} />
-              <TextInput
-                value={draft.householdName}
-                onChangeText={(householdName) => setDraft({ ...draft, householdName })}
-                placeholder={t.onboarding.homePlaceholder}
-                placeholderTextColor={c.textSoft}
-                style={[styles.input, { color: c.text }]}
-              />
-            </View>
-          </View>
-        )}
-
         {step === 'ready' && (
           <View style={[styles.pad, { alignItems: 'center', paddingTop: 24 }]}>
             <LinearGradient colors={[...gradient.hero]} style={styles.readyHero}>
-              <Image source={images.onboarding} style={styles.readyImg} />
               <View style={styles.readyCheck}><Check size={26} color="#fff" /></View>
             </LinearGradient>
             <Text style={[styles.eyebrow, { color: c.primary, marginTop: 22 }]}>{t.onboarding.readyEyebrow}</Text>
@@ -281,11 +200,6 @@ const styles = StyleSheet.create({
   eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: '800' },
   h1: { fontSize: 28, lineHeight: 34, letterSpacing: -0.8, fontWeight: '800', marginTop: 10 },
   bodyText: { fontSize: 15, lineHeight: 22, marginTop: 10 },
-  visualWrap: { marginTop: 14, borderRadius: 28, overflow: 'hidden', backgroundColor: '#0C1E7D' },
-  focus: { position: 'absolute', right: 18, top: 18, width: 45, height: 45, borderRadius: 15, backgroundColor: 'rgba(255,255,255,0.92)', alignItems: 'center', justifyContent: 'center' },
-  floatCard: { position: 'absolute', left: 16, bottom: 16, flexDirection: 'row', alignItems: 'center', gap: 7, backgroundColor: 'rgba(255,255,255,0.9)', paddingHorizontal: 14, paddingVertical: 12, borderRadius: 13 },
-  floatText: { color: '#293FBD', fontWeight: '800', fontSize: 12 },
-  note: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 12, borderRadius: 14, marginTop: 18 },
   langCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: 1.5 },
   langCode: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   langName: { fontSize: 16, fontWeight: '800' },
@@ -300,10 +214,7 @@ const styles = StyleSheet.create({
   themeBar: { height: 30, borderRadius: 8 },
   themeLine: { height: 12, borderRadius: 5, backgroundColor: '#fff' },
   themeLabel: { flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 },
-  inputWrap: { marginTop: 20, height: 54, borderRadius: 16, borderWidth: 1, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10 },
-  input: { flex: 1, fontSize: 16, fontWeight: '600' },
   readyHero: { width: 200, height: 160, borderRadius: 36, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-  readyImg: { width: '100%', height: '100%' },
   readyCheck: { position: 'absolute', right: 12, bottom: 12, width: 52, height: 52, borderRadius: 26, backgroundColor: '#1BA968', alignItems: 'center', justifyContent: 'center', borderWidth: 4, borderColor: 'rgba(255,255,255,0.85)' },
   footer: { paddingHorizontal: 24, paddingTop: 8, width: '100%' },
 });

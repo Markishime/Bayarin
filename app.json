@@ -31,7 +31,7 @@
       "bundler": "metro"
     },
     "plugins": [
-      "expo-av",
+      "expo-video",
       "expo-web-browser",
       "expo-image",
       "expo-sharing"

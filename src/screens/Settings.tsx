@@ -2,16 +2,20 @@ import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   Bell, Check, CheckCircle2, ChevronRight, CreditCard, Download, Film, History, Info,
-  Languages, LogOut, Moon, Pencil, Play, Plus, ShieldCheck, Sun, Users, X,
+  Languages, LogOut, Moon, Pencil, Play, ShieldCheck, Sun, Users, X,
 } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
-import { AppHeader, BottomNav, BrandLogo, Card, InfoBanner, PrefSwitch, PrimaryButton, ScreenScroll } from '../components/ui';
-import { DEMO_EMAIL, defaultOnboarding, demoMembers, images } from '../data';
+import { Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
+import { AppHeader, BottomNav, BrandLogo, Card, CinematicHero, Field, InfoBanner, PrefSwitch, PrimaryButton, ScreenScroll } from '../components/ui';
+import { images } from '../data';
 import { languageOptions, type Copy } from '../i18n';
 import { supabase } from '../lib/supabase';
+import { createHousehold, fetchHouseholdUsers, joinHousehold, removeHouseholdUser, type Household, type HouseholdUser } from '../services/households';
 import { gradient, type Palette } from '../theme';
-import type { HouseholdMember, Lang, OnboardingDraft, Screen } from '../types';
+import type { Lang, OnboardingDraft, Screen } from '../types';
+
+const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
 export function SettingsScreen({
   go, t, c, dark, lang, userName, email, onLogout,
@@ -20,16 +24,11 @@ export function SettingsScreen({
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.settings.title} c={c} />
       <ScreenScroll withNav>
-        <View style={[styles.profile, { backgroundColor: c.surface }]}>
-          <Image source={images.auth} style={styles.avatar} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontWeight: '800', fontSize: 16 }}>{userName}</Text>
-            <Text style={{ color: c.textMuted, fontSize: 12 }}>{email}</Text>
-          </View>
-          <Pressable onPress={() => go('edit-profile')} style={[styles.edit, { backgroundColor: c.primarySoft }]} accessibilityLabel={t.profile.edit}>
+        <CinematicHero pose="profile" height={168} c={c} title={userName} subtitle={email}>
+          <Pressable onPress={() => go('edit-profile')} style={[styles.edit, { backgroundColor: c.primarySoft, marginTop: 10 }]} accessibilityLabel={t.profile.edit}>
             <Pencil size={15} color={c.primary} />
           </Pressable>
-        </View>
+        </CinematicHero>
         <Group title={t.settings.household} c={c}>
           <Row icon={<Users size={15} color={c.primary} />} label={t.settings.members} onPress={() => go('household')} c={c} />
           <Row icon={<CreditCard size={15} color={c.primary} />} label={t.settings.methods} value="GCash, Maya, BPI" onPress={() => go('payment-methods')} c={c} />
@@ -45,7 +44,6 @@ export function SettingsScreen({
           <Row icon={<History size={15} color={c.primary} />} label={t.settings.activity} onPress={() => go('activity')} c={c} />
         </Group>
         <Group title={t.settings.aboutGroup} c={c}>
-          <Row icon={<Film size={15} color={c.primary} />} label={t.settings.story} onPress={() => go('story')} c={c} />
           <Row icon={<Info size={15} color={c.primary} />} label={t.settings.about} value="Version 2.0" onPress={() => go('about')} c={c} />
         </Group>
         <Pressable onPress={onLogout} style={[styles.logout, { borderColor: c.border, backgroundColor: c.surface }]}>
@@ -53,7 +51,7 @@ export function SettingsScreen({
           <Text style={{ color: c.danger, fontWeight: '800' }}>{t.settings.logout}</Text>
         </Pressable>
         <View style={{ alignItems: 'center', marginTop: 22 }}>
-          <BrandLogo />
+          <BrandLogo c={c} />
           <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 8 }}>{t.settings.madeFor}</Text>
         </View>
       </ScreenScroll>
@@ -67,6 +65,7 @@ export function LanguageScreen({ go, t, c, lang, setLang }: { go: (s: Screen) =>
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.language.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="profile" height={132} c={c} title={t.language.choose} subtitle={t.language.body} />
         <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.language.choose}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.language.body}</Text>
         <Card c={c} style={{ paddingHorizontal: 14, paddingVertical: 0 }}>
@@ -99,11 +98,12 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.appearance.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="profile" height={132} c={c} title={t.appearance.make} subtitle={t.appearance.body} />
         <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.appearance.make}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.appearance.body}</Text>
         <View style={{ flexDirection: 'row', gap: 11, marginBottom: 15 }}>
           <Pressable onPress={() => setDark(false)} style={[styles.themeCard, { borderColor: !dark ? c.primary : 'transparent', backgroundColor: c.surface }]}>
-            <View style={[styles.preview, { backgroundColor: '#F7F4EF' }]}>
+            <View style={[styles.preview, { backgroundColor: '#EEF1F7' }]}>
               <LinearGradient colors={[...gradient.hero]} style={{ height: 30, borderRadius: 8 }} />
               <View style={styles.line} /><View style={[styles.line, { width: '65%' }]} />
             </View>
@@ -113,9 +113,9 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
             {!dark && <CheckCircle2 size={16} color={c.primary} style={{ position: 'absolute', right: 12, bottom: 11 }} />}
           </Pressable>
           <Pressable onPress={() => setDark(true)} style={[styles.themeCard, { borderColor: dark ? c.primary : 'transparent', backgroundColor: c.surface }]}>
-            <View style={[styles.preview, { backgroundColor: '#151412' }]}>
+            <View style={[styles.preview, { backgroundColor: '#12182A' }]}>
               <LinearGradient colors={[...gradient.hero]} style={{ height: 30, borderRadius: 8 }} />
-              <View style={[styles.line, { backgroundColor: '#272522' }]} /><View style={[styles.line, { width: '65%', backgroundColor: '#272522' }]} />
+              <View style={[styles.line, { backgroundColor: '#263352' }]} /><View style={[styles.line, { width: '65%', backgroundColor: '#263352' }]} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 }}>
               <Moon size={13} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.settings.dark}</Text>
@@ -143,6 +143,7 @@ export function PrivacyScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.privacy.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="profile" height={132} c={c} title={t.privacy.hero} subtitle={t.privacy.heroBody} />
         <View style={[styles.privacyHero, { backgroundColor: c.primarySoft }]}>
           <ShieldCheck size={44} color={c.primary} />
           <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 10, textAlign: 'center' }}>{t.privacy.hero}</Text>
@@ -170,25 +171,22 @@ export function PrivacyScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
 }
 
 export function EditProfileScreen({
-  go, t, c, userId, demo, userName, setUserName, householdName, setHouseholdName,
+  go, t, c, userId, userName, setUserName,
 }: {
-  go: (s: Screen) => void; t: Copy; c: Palette; userId: string; demo: boolean;
+  go: (s: Screen) => void; t: Copy; c: Palette; userId: string;
   userName: string; setUserName: (n: string) => void;
-  householdName: string; setHouseholdName: (n: string) => void;
 }) {
   const [name, setName] = useState(userName);
-  const [household, setHousehold] = useState(householdName);
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState('');
   const save = async () => {
     setSaving(true);
     setMessage('');
-    if (!demo && supabase) {
-      const { error } = await supabase.from('profiles').update({ full_name: name.trim(), household_name: household.trim() }).eq('id', userId);
+    if (supabase) {
+      const { error } = await supabase.from('profiles').update({ full_name: name.trim() }).eq('id', userId);
       if (error) { setMessage(error.message); setSaving(false); return; }
     }
     setUserName(name.trim() || 'Home organizer');
-    setHouseholdName(household.trim() || defaultOnboarding.householdName);
     setSaving(false);
     setMessage(t.profile.saved);
     setTimeout(() => go('settings'), 500);
@@ -197,14 +195,10 @@ export function EditProfileScreen({
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.profile.edit} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
-        <LinearGradient colors={[...gradient.hero]} style={styles.editHero}>
-          <Image source={images.auth} style={styles.avatarLg} />
-          <BrandLogo inverted />
-        </LinearGradient>
+        <CinematicHero pose="profile" height={150} c={c} title={t.profile.edit} subtitle={t.profile.display} />
         <Card c={c} style={{ gap: 12 }}>
           <Labeled c={c} label={t.profile.display} value={name} onChange={setName} />
-          <Labeled c={c} label={t.profile.household} value={household} onChange={setHousehold} />
-          <Labeled c={c} label={t.profile.email} value={demo ? DEMO_EMAIL : 'Connected Supabase account'} editable={false} />
+          <Labeled c={c} label={t.profile.email} value="Connected Supabase account" editable={false} />
           {message ? <Text style={{ color: c.success }}>{message}</Text> : null}
           <PrimaryButton title={t.profile.save} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
         </Card>
@@ -213,66 +207,108 @@ export function EditProfileScreen({
   );
 }
 
-export function HouseholdScreen({ go, t, c, userId, demo }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; demo: boolean }) {
-  const [members, setMembers] = useState<HouseholdMember[]>(demoMembers);
-  const [adding, setAdding] = useState(false);
-  const [name, setName] = useState('');
-  useEffect(() => {
-    if (demo || !supabase || !userId) return;
-    void supabase.from('household_members').select('id,name,role,contact').eq('user_id', userId).order('created_at').then(({ data }) => {
-      if (data?.length) setMembers(data as HouseholdMember[]);
-    });
-  }, [demo, userId]);
-  const add = async () => {
-    const member = { id: `local-${Date.now()}`, name: name.trim(), role: t.household.member, contact: '' };
-    if (!member.name) return;
-    if (!demo && supabase) {
-      const { data, error } = await supabase.from('household_members').insert({ user_id: userId, name: member.name, role: member.role }).select('id,name,role,contact').single();
-      if (!error && data) setMembers((current) => [...current, data as HouseholdMember]);
-    } else setMembers((current) => [...current, member]);
-    setName('');
-    setAdding(false);
-  };
-  const remove = async (member: HouseholdMember) => {
-    if (!demo && supabase && !member.id.startsWith('demo')) await supabase.from('household_members').delete().eq('id', member.id).eq('user_id', userId);
-    setMembers((current) => current.filter((item) => item.id !== member.id));
+export function HouseholdSetupScreen({
+  go, t, c, onJoined,
+}: { go: (s: Screen) => void; t: Copy; c: Palette; onJoined: (household: Household) => void }) {
+  const [newName, setNewName] = useState('');
+  const [lookup, setLookup] = useState('');
+  const [busy, setBusy] = useState<'create' | 'join' | null>(null);
+  const [error, setError] = useState('');
+  const run = async (action: 'create' | 'join') => {
+    const value = action === 'create' ? newName : lookup;
+    if (!value.trim()) { setError(action === 'create' ? 'Enter a household name.' : 'Enter a Household ID or exact household name.'); return; }
+    setError('');
+    setBusy(action);
+    try {
+      const next = action === 'create' ? await createHousehold(value) : await joinHousehold(value);
+      onJoined(next);
+    } catch (reason) {
+      const detail = typeof reason === 'object' && reason && 'message' in reason ? String(reason.message) : '';
+      setError(detail || 'Something went wrong. Please try again.');
+    } finally { setBusy(null); }
   };
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <AppHeader title={t.household.title} onBack={() => go('settings')} c={c} trailing={
-        <Pressable onPress={() => setAdding(!adding)} style={[styles.accent, { backgroundColor: c.primary }]}><Plus size={18} color="#fff" /></Pressable>
-      } />
+      <AppHeader title="Set up your household" onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="home" height={142} c={c} title="One shared home" subtitle="Create your household or join the people you live with." />
+        <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
+          <Users size={42} color={c.primary} />
+          <Text style={{ color: c.text, fontSize: 23, fontWeight: '800', marginTop: 10 }}>One shared home, one clear view.</Text>
+          <Text style={{ color: c.textMuted, textAlign: 'center', lineHeight: 19 }}>Create a household as its admin, or join one your organizer already created.</Text>
+        </View>
+        {error ? <InfoBanner c={c} icon={<ShieldCheck size={15} color={c.danger} />}>{error}</InfoBanner> : null}
+        <Card c={c} style={{ gap: 13, marginBottom: 13 }}>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>Create a household</Text>
+          <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18 }}>You’ll be the admin and can share the Household ID with family members.</Text>
+          <Field c={c} label="Household name" value={newName} onChangeText={setNewName} placeholder="e.g. Dela Cruz Household" autoCapitalize="words" icon={<Users size={17} color={c.primary} />} />
+          <PrimaryButton title={busy === 'create' ? 'Creating household…' : 'Create household'} loading={busy === 'create'} onPress={() => void run('create')} c={c} />
+        </Card>
+        <Card c={c} style={{ gap: 13 }}>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>Join an existing household</Text>
+          <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18 }}>Enter the 8-character Household ID from the admin, or the exact household name.</Text>
+          <Field c={c} label="Household ID or name" value={lookup} onChangeText={setLookup} placeholder="e.g. A1B2C3D4" autoCapitalize="characters" autoCorrect={false} icon={<Users size={17} color={c.primary} />} />
+          <PrimaryButton title={busy === 'join' ? 'Joining household…' : 'Join household'} loading={busy === 'join'} onPress={() => void run('join')} c={c} />
+        </Card>
+      </ScreenScroll>
+    </View>
+  );
+}
+
+export function HouseholdScreen({ go, t, c, userId, household }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; household: Household | null }) {
+  const [members, setMembers] = useState<HouseholdUser[]>([]);
+  const [error, setError] = useState('');
+  const load = async () => {
+    if (!household) return;
+    setMembers(await fetchHouseholdUsers(household.id));
+  };
+  useEffect(() => { void load(); }, [household?.id]);
+  const remove = async (member: HouseholdUser) => {
+    setError('');
+    try { await removeHouseholdUser(member.user_id); await load(); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not remove this member.'); }
+  };
+  if (!household) return <HouseholdSetupScreen go={go} t={t} c={c} onJoined={() => go('home')} />;
+  const isAdmin = household.role === 'admin';
+  return (
+    <View style={{ flex: 1, backgroundColor: c.bg }}>
+      <AppHeader title={t.household.title} onBack={() => go('settings')} c={c} />
+      <ScreenScroll>
+        <CinematicHero pose="home" height={142} c={c} title={household.name} subtitle={isAdmin ? 'You administer this household.' : 'You are a household member.'} />
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 12 }}>
           <View style={[styles.iconSoft, { width: 44, height: 44, borderRadius: 14, backgroundColor: c.primarySoft }]}><Users size={20} color={c.primary} /></View>
           <View>
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>Dela Cruz Household</Text>
-            <Text style={{ color: c.textMuted, fontSize: 12 }}>{t.household.share}</Text>
+            <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>{household.name}</Text>
+            <Text style={{ color: c.textMuted, fontSize: 12 }}>{isAdmin ? 'You administer this household.' : 'You are a household member.'}</Text>
           </View>
         </View>
+        <Card c={c} style={{ marginBottom: 12, backgroundColor: c.primarySoft }}>
+          <Text style={{ color: c.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>HOUSEHOLD ID</Text>
+          <Text selectable style={{ color: c.text, fontSize: 24, fontWeight: '900', letterSpacing: 2, marginTop: 4 }}>{household.join_id}</Text>
+          <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 6 }}>Share this ID so family members can join this exact household.</Text>
+        </Card>
+        {error ? <InfoBanner c={c} icon={<ShieldCheck size={15} color={c.danger} />}>{error}</InfoBanner> : null}
         <InfoBanner c={c} icon={<ShieldCheck size={15} color={c.warning} />}>{t.household.banner}</InfoBanner>
-        {adding && (
-          <View style={[styles.inline, { backgroundColor: c.surface }]}>
-            <TextInput value={name} onChangeText={setName} placeholder={t.household.placeholder} placeholderTextColor={c.textSoft} style={[styles.inlineInput, { color: c.text, backgroundColor: c.bg }]} />
-            <Pressable onPress={() => void add()} style={[styles.addBtn, { backgroundColor: c.primary }]}><Text style={{ color: '#fff', fontWeight: '800' }}>{t.household.add}</Text></Pressable>
-          </View>
-        )}
         <Card c={c} style={{ paddingHorizontal: 14, paddingVertical: 0 }}>
-          {members.map((member, index) => (
-            <View key={member.id} style={[styles.member, { borderBottomColor: c.border }]}>
-              <View style={styles.memberAv}><Text style={{ color: '#2E43C6', fontWeight: '800' }}>{member.name.split(' ').map((p) => p[0]).join('').slice(0, 2)}</Text></View>
+          {members.map((member) => {
+            const name = member.profile?.full_name || 'Household member';
+            const isYou = member.user_id === userId;
+            return <View key={member.user_id} style={[styles.member, { borderBottomColor: c.border }]}>
+              <View style={[styles.memberAv, { backgroundColor: c.primarySoft }]}><Text style={{ color: c.primary, fontWeight: '800' }}>{name.split(' ').map((p) => p[0]).join('').slice(0, 2)}</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontWeight: '800' }}>{member.name}</Text>
-                <Text style={{ color: c.textMuted, fontSize: 12 }}>{member.role}{member.contact ? ` · ${member.contact}` : ''}</Text>
+                <Text style={{ color: c.text, fontWeight: '800' }}>{name}</Text>
+                <Text style={{ color: c.textMuted, fontSize: 12 }}>{member.role === 'admin' ? 'Admin' : t.household.member}</Text>
+                {isYou && <Text style={{ color: c.primary, fontSize: 11, fontWeight: '700', marginTop: 2 }}>{t.household.you}</Text>}
               </View>
-              {index > 0 && (
+              {isAdmin && !isYou && (
                 <Pressable onPress={() => void remove(member)} style={[styles.remove, { backgroundColor: c.dangerSoft }]}>
                   <X size={14} color={c.danger} />
                 </Pressable>
               )}
-            </View>
-          ))}
+            </View>;
+          })}
         </Card>
+        <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 12, paddingHorizontal: 2 }}>Everyone here sees the same household bills and activity. Only admins can remove members.</Text>
       </ScreenScroll>
     </View>
   );
@@ -284,6 +320,7 @@ export function PaymentMethodsScreen({ go, t, c }: { go: (s: Screen) => void; t:
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.payments.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="bills" height={136} c={c} title={t.payments.hero} subtitle={t.payments.body} />
         <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
           <CreditCard size={43} color={c.primary} />
           <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', marginTop: 10 }}>{t.payments.hero}</Text>
@@ -309,18 +346,18 @@ export function PaymentMethodsScreen({ go, t, c }: { go: (s: Screen) => void; t:
 }
 
 export function NotificationSettingsScreen({
-  go, t, c, userId, demo, draft,
-}: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; demo: boolean; draft: OnboardingDraft }) {
+  go, t, c, userId, draft,
+}: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; draft: OnboardingDraft }) {
   const [prefs, setPrefs] = useState({ due_soon: draft.dueSoon, weekly_summary: draft.weeklySummary, payment_updates: true, government_deadlines: draft.lingkodDeadlines });
   const [saved, setSaved] = useState(false);
   useEffect(() => {
-    if (demo || !supabase || !userId) return;
+    if (!supabase || !userId) return;
     void supabase.from('notification_preferences').select('due_soon,weekly_summary,payment_updates,government_deadlines').eq('user_id', userId).maybeSingle().then(({ data }) => {
       if (data) setPrefs(data);
     });
-  }, [demo, userId]);
+  }, [userId]);
   const save = async () => {
-    if (!demo && supabase) await supabase.from('notification_preferences').upsert({ user_id: userId, ...prefs });
+    if (supabase) await supabase.from('notification_preferences').upsert({ user_id: userId, ...prefs });
     setSaved(true);
     setTimeout(() => setSaved(false), 1800);
   };
@@ -328,6 +365,7 @@ export function NotificationSettingsScreen({
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.notifSettings.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="calendar" height={136} c={c} title={t.notifSettings.hero} subtitle={t.notifSettings.body} />
         <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.notifSettings.hero}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.notifSettings.body}</Text>
         <Card c={c} style={{ paddingHorizontal: 14 }}>
@@ -344,17 +382,17 @@ export function NotificationSettingsScreen({
   );
 }
 
-export function ExportDataScreen({ go, t, c, userId, demo }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; demo: boolean }) {
+export function ExportDataScreen({ go, t, c, userId, householdId }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string }) {
   const [exporting, setExporting] = useState(false);
   const [done, setDone] = useState(false);
   const download = async () => {
     setExporting(true);
-    let payload: unknown = { profile: { name: 'Juan Dela Cruz' }, exported_at: new Date().toISOString(), mode: 'demo' };
-    if (!demo && supabase) {
+    let payload: unknown = { profile: {}, bills: [], activity: [], exported_at: new Date().toISOString() };
+    if (supabase && userId) {
       const [profileResult, billResult, activityResult] = await Promise.all([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
-        supabase.from('bills').select('*').eq('user_id', userId),
-        supabase.from('activity_events').select('*').eq('user_id', userId),
+        supabase.from('bills').select('*').eq('household_id', householdId),
+        supabase.from('activity_events').select('*').eq('household_id', householdId),
       ]);
       payload = { profile: profileResult.data, bills: billResult.data, activity: activityResult.data, exported_at: new Date().toISOString() };
     }
@@ -372,6 +410,7 @@ export function ExportDataScreen({ go, t, c, userId, demo }: { go: (s: Screen) =
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.export.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        <CinematicHero pose="profile" height={136} c={c} title={t.export.hero} subtitle={t.export.body} />
         <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
           <Download size={43} color={c.primary} />
           <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', marginTop: 10 }}>{t.export.hero}</Text>
@@ -398,10 +437,10 @@ export function AboutScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c:
       <AppHeader title={t.about.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
         <View style={styles.aboutHero}>
-          <Image source={images.story} style={StyleSheet.absoluteFillObject} />
+          <Image source={images.story} style={StyleSheet.absoluteFill} />
           <LinearGradient colors={['rgba(4,10,55,0.1)', 'rgba(4,8,36,0.92)']} style={StyleSheet.absoluteFill} />
           <View style={{ position: 'absolute', left: 18, right: 18, bottom: 20 }}>
-            <BrandLogo inverted />
+            <BrandLogo inverted c={c} />
             <Text style={{ color: '#fff', fontSize: 25, fontWeight: '800', marginTop: 14 }}>{t.about.hero}</Text>
             <Text style={{ color: '#DBE1FF', fontSize: 13, marginTop: 6 }}>{t.about.body}</Text>
           </View>
@@ -414,7 +453,6 @@ export function AboutScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c:
             </View>
           ))}
         </Card>
-        <PrimaryButton title={t.brand.storyCta} onPress={() => go('story')} c={c} icon={<Play size={16} color="#fff" />} />
         <Text style={{ textAlign: 'center', color: c.textMuted, fontSize: 12, marginTop: 14 }}>{t.about.version}</Text>
       </ScreenScroll>
     </View>
@@ -428,37 +466,41 @@ function Calendarish({ size, color }: { size: number; color: string }) {
 function Group({ title, children, c }: { title: string; children: ReactNode; c: Palette }) {
   return (
     <View style={{ marginTop: 19 }}>
-      <Text style={{ color: c.textMuted, fontSize: 12, marginLeft: 4, marginBottom: 7, fontWeight: '700' }}>{title}</Text>
-      <View style={{ backgroundColor: c.surface, borderRadius: 17, paddingHorizontal: 13 }}>{children}</View>
+      <Text style={{ color: c.textMuted, fontSize: 12, marginLeft: 4, marginBottom: 7, fontWeight: '800', letterSpacing: 0.3 }}>{title}</Text>
+      <View style={{ backgroundColor: c.surface, borderRadius: 17, paddingHorizontal: 13, borderWidth: 1, borderColor: c.border }}>{children}</View>
     </View>
   );
 }
 
 function Row({ icon, label, value, onPress, c }: { icon: ReactNode; label: string; value?: string; onPress: () => void; c: Palette }) {
+  const s = useSharedValue(1);
+  const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
-    <Pressable onPress={onPress} style={[styles.settingRow, { borderBottomColor: c.border }]}>
+    <AnimatedPressable
+      onPressIn={() => { s.value = withSpring(0.985, { damping: 16, stiffness: 320 }); }}
+      onPressOut={() => { s.value = withSpring(1, { damping: 12, stiffness: 260 }); }}
+      onPress={onPress}
+      style={[styles.settingRow, { borderBottomColor: c.border }, anim]}
+    >
       <View style={[styles.iconSoft, { backgroundColor: c.surface2 }]}>{icon}</View>
       <Text style={{ color: c.text, fontWeight: '800', flex: 1 }}>{label}</Text>
       {value ? <Text style={{ color: c.textMuted, fontSize: 12 }}>{value}</Text> : null}
       <ChevronRight size={14} color={c.textMuted} />
-    </Pressable>
+    </AnimatedPressable>
   );
 }
 
 function Labeled({ c, label, value, onChange, editable = true }: { c: Palette; label: string; value: string; onChange?: (v: string) => void; editable?: boolean }) {
   return (
-    <View style={{ gap: 6 }}>
-      <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '700' }}>{label}</Text>
-      <TextInput editable={editable} value={value} onChangeText={onChange} style={[styles.field, { color: c.text, backgroundColor: c.bg, borderColor: c.border }]} />
-    </View>
+    <Field c={c} label={label} editable={editable} value={value} onChangeText={onChange} autoCapitalize="words" />
   );
 }
 
 const styles = StyleSheet.create({
   profile: { flexDirection: 'row', alignItems: 'center', gap: 11, padding: 15, borderRadius: 17 },
   avatar: { width: 52, height: 52, borderRadius: 26 },
-  avatarLg: { width: 64, height: 64, borderRadius: 32, backgroundColor: '#E0E7FF' },
-  edit: { width: 34, height: 34, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
+  avatarLg: { width: 64, height: 64, borderRadius: 32 },
+  edit: { width: 40, height: 40, borderRadius: 12, alignItems: 'center', justifyContent: 'center', alignSelf: 'flex-start' },
   settingRow: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
   iconSoft: { width: 31, height: 31, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   logout: { height: 48, borderWidth: 1, borderRadius: 13, marginTop: 18, flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 8 },
@@ -472,13 +514,12 @@ const styles = StyleSheet.create({
   privacyRow: { flexDirection: 'row', gap: 12, paddingVertical: 15, borderBottomWidth: StyleSheet.hairlineWidth },
   legal: { padding: 14, borderRadius: 13, marginTop: 12 },
   editHero: { minHeight: 130, marginBottom: 14, padding: 17, borderRadius: 21, flexDirection: 'row', alignItems: 'center', gap: 15 },
-  field: { height: 46, borderWidth: 1, borderRadius: 12, paddingHorizontal: 12 },
   accent: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
   inline: { flexDirection: 'row', gap: 7, marginBottom: 12, padding: 10, borderRadius: 15 },
-  inlineInput: { flex: 1, height: 40, borderRadius: 10, paddingHorizontal: 10 },
+  inlineInput: { flex: 1, height: 44, borderWidth: 1.5, borderRadius: 12, paddingHorizontal: 12 },
   addBtn: { height: 40, paddingHorizontal: 14, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   member: { minHeight: 66, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
-  memberAv: { width: 36, height: 36, borderRadius: 12, backgroundColor: '#DFE6FF', alignItems: 'center', justifyContent: 'center' },
+  memberAv: { width: 36, height: 36, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
   remove: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   centerHero: { padding: 25, marginBottom: 13, borderRadius: 22, alignItems: 'center', gap: 6 },
   method: { minHeight: 62, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },

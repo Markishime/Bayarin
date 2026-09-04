@@ -1,13 +1,12 @@
-import { Video, ResizeMode } from 'expo-av';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Bell, CalendarDays, ChevronRight, Play, ShieldCheck } from 'lucide-react-native';
-import { Pressable, StyleSheet, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, PrimaryButton } from '../components/ui';
-import { storyVideo } from '../data';
+import { images } from '../data';
 import type { Copy } from '../i18n';
 import { useLayout } from '../layout';
-import { Float3D, OrbitOrb, Stagger } from '../motion';
+import { Float3D, FadeScale, Stagger } from '../motion';
 import type { Palette } from '../theme';
 import type { Screen } from '../types';
 
@@ -16,25 +15,24 @@ export function WelcomeScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
   const layout = useLayout();
   return (
     <View style={[styles.root, { justifyContent: 'space-between' }]}>
-      <Video source={storyVideo} style={StyleSheet.absoluteFill} resizeMode={ResizeMode.COVER} shouldPlay isLooping isMuted />
-      <LinearGradient colors={['rgba(4,17,82,0.28)', 'rgba(5,12,53,0.5)', 'rgba(5,12,53,0.96)']} style={StyleSheet.absoluteFill} />
-      <OrbitOrb size={220} color="rgba(91,43,212,0.45)" radiusX={140} radiusY={80} duration={12000} />
-      <OrbitOrb size={110} color="rgba(213,44,121,0.4)" radiusX={200} radiusY={130} duration={9000} delay={300} />
-      <OrbitOrb size={70} color="rgba(22,139,255,0.5)" radiusX={80} radiusY={170} duration={7000} delay={700} />
+      <View style={[StyleSheet.absoluteFill, styles.background, { pointerEvents: 'none' }]}>
+        <Image source={images.welcome} style={styles.backgroundImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+      </View>
+      <LinearGradient colors={['rgba(8,16,48,0.18)', 'rgba(8,16,48,0.08)', 'rgba(6,12,40,0.55)']} style={[StyleSheet.absoluteFill, styles.backgroundOverlay]} />
 
-      <View style={[styles.top, { paddingTop: insets.top + 8, paddingHorizontal: layout.pad }]}>
+      <View style={[styles.top, styles.foreground, { paddingTop: insets.top + 8, paddingHorizontal: layout.pad }]}>
         <Text style={styles.kicker}>{t.welcome.organize}</Text>
         <Text style={styles.kicker}>{t.welcome.stayOnTrack}</Text>
       </View>
 
-      <View style={[styles.brand, { marginTop: layout.isCompact ? 12 : 28 }]}>
+      <View style={[styles.brand, styles.foreground, { marginTop: layout.isCompact ? 12 : 28 }]}>
         <BrandMark size={layout.isCompact ? 56 : 78} fontSize={layout.isCompact ? 34 : 48} />
         <Stagger index={0}><Text style={[styles.title, { fontSize: layout.titleSize + (layout.isCompact ? 4 : 8) }]}>{t.brand.name}</Text></Stagger>
         <Stagger index={1}><Text style={styles.tag}>{t.brand.tagline}</Text></Stagger>
         <Stagger index={2}><Text style={styles.sub}>{t.brand.forFilipinos}</Text></Stagger>
       </View>
 
-      {!layout.isCompact && <View style={[styles.rail, { paddingHorizontal: layout.pad }]}>
+      {!layout.isCompact && <View style={[styles.rail, styles.foreground, { paddingHorizontal: layout.pad }]}>
         {[
           { Icon: CalendarDays, label: t.welcome.featureOrg },
           { Icon: Bell, label: t.welcome.featureRemind },
@@ -51,16 +49,16 @@ export function WelcomeScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
         ))}
       </View>}
 
-      <View style={[styles.actions, { paddingBottom: insets.bottom + 20, paddingHorizontal: layout.pad, maxWidth: 520, width: '100%', alignSelf: 'center' }]}>
-        <PrimaryButton title={t.welcome.start} onPress={() => go('onboarding')} light c={c} icon={<ChevronRight size={18} color="#253CC0" />} />
-        <Pressable onPress={() => go('story')} style={styles.storyLink}>
-          <Play size={14} color="#fff" fill="#fff" />
-          <Text style={styles.storyText}>{t.brand.storyCta}</Text>
-        </Pressable>
-        <Pressable onPress={() => go('login')} style={styles.loginLink}>
-          <Text style={styles.loginMuted}>{t.brand.hasAccount} </Text>
-          <Text style={styles.loginBold}>{t.brand.login}</Text>
-        </Pressable>
+      <View style={[styles.actions, styles.foreground, { paddingBottom: insets.bottom + 20, paddingHorizontal: layout.pad, maxWidth: 520, width: '100%', alignSelf: 'center' }]}>
+        <FadeScale delay={120}>
+          <PrimaryButton title={t.welcome.start} onPress={() => go('onboarding')} light c={c} icon={<ChevronRight size={18} color="#253CC0" />} />
+        </FadeScale>
+        <FadeScale delay={320}>
+          <Pressable onPress={() => go('login')} style={styles.loginLink}>
+            <Text style={styles.loginMuted}>{t.brand.hasAccount} </Text>
+            <Text style={styles.loginBold}>{t.brand.login}</Text>
+          </Pressable>
+        </FadeScale>
       </View>
     </View>
   );
@@ -68,8 +66,12 @@ export function WelcomeScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
 
 const styles = StyleSheet.create({
   root: { flex: 1, backgroundColor: '#07195F', overflow: 'hidden' },
+  background: { zIndex: 0, overflow: 'hidden' },
+  backgroundImage: { width: '100%', height: '100%' },
+  backgroundOverlay: { zIndex: 1 },
+  foreground: { zIndex: 2 },
   top: { flexDirection: 'row', justifyContent: 'space-between' },
-  kicker: { color: '#DCE1FF', fontSize: 11, letterSpacing: 1.2, textTransform: 'uppercase', fontWeight: '700' },
+  kicker: { color: '#E8ECFF', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase', fontWeight: '700' },
   brand: { alignItems: 'center', marginTop: 28 },
   title: { color: '#fff', fontWeight: '900', letterSpacing: -1.6, marginTop: 16, textShadowColor: 'rgba(0,0,40,0.35)', textShadowRadius: 16 },
   tag: { color: '#fff', fontSize: 16, fontWeight: '700' },

@@ -46,3 +46,7 @@ Thumbs.db
 /.wrangler/
 /outputs/
 /work/
+
+# local tooling / temp
+/.grok-verify/
+/supabase/.temp/

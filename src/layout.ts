@@ -8,7 +8,7 @@ export function useLayout() {
   const appWidth = framed ? frameWidth : width;
   const appHeight = framed ? frameHeight : height;
   const isCompact = appHeight < 740;
-  const pad = 16;
+  const pad = width >= 680 ? 20 : 18;
   const titleSize = isCompact ? 26 : 28;
   const heroH = isCompact ? 196 : 248;
 

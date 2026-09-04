@@ -1,70 +1,83 @@
 export const light = {
-  bg: '#F3F5FB',
-  bgElevated: '#FFFFFF',
-  surface: '#FFFFFF',
-  surface2: '#EEF1F8',
-  text: '#101528',
-  textMuted: '#6B7190',
-  textSoft: '#8B90A8',
-  border: '#E2E6F2',
-  primary: '#2F46E8',
-  primaryDeep: '#1A2FBE',
-  primarySoft: '#EEF1FF',
-  accent: '#E72A7A',
-  warning: '#C47A12',
-  warningSoft: '#FFF3DD',
-  danger: '#D53637',
-  dangerSoft: '#FDECEA',
-  success: '#16814D',
-  successSoft: '#EAF8F0',
-  overlay: 'rgba(10, 14, 40, 0.48)',
-  nav: 'rgba(255,255,255,0.92)',
-  shadow: 'rgba(30, 35, 102, 0.10)',
+  bg: '#EEF1F7',
+  bgElevated: '#F6F8FC',
+  surface: '#F8FAFE',
+  surface2: '#E7EDF6',
+  text: '#1B2540',
+  textMuted: '#4A5874',
+  textSoft: '#66758F',
+  border: '#D0D8E8',
+  primary: '#2E5FE0',
+  primaryDeep: '#244CC0',
+  primarySoft: '#E4ECFC',
+  accent: '#6A4AD4',
+  warning: '#A65A0C',
+  warningSoft: '#F6E9D4',
+  danger: '#C4334A',
+  dangerSoft: '#F6E2E6',
+  success: '#1B7A52',
+  successSoft: '#D9EEE4',
+  overlay: 'rgba(18, 28, 52, 0.48)',
+  nav: '#F4F6FB',
+  shadow: 'rgba(28, 48, 92, 0.10)',
+  onPrimary: '#F5F8FF',
 };
 
 export const dark = {
-  bg: '#0B0E1A',
-  bgElevated: '#15192B',
-  surface: '#181C2D',
-  surface2: '#22263A',
-  text: '#F5F6FB',
-  textMuted: '#A8AEC1',
-  textSoft: '#7E849A',
-  border: '#343A54',
-  primary: '#7C92FF',
-  primaryDeep: '#5B73F2',
-  primarySoft: '#202A55',
-  accent: '#FF4D96',
-  warning: '#E1A044',
-  warningSoft: '#362913',
-  danger: '#E06A61',
-  dangerSoft: '#3B201E',
-  success: '#3DCF8A',
-  successSoft: '#163326',
-  overlay: 'rgba(4, 6, 18, 0.64)',
-  nav: 'rgba(18, 22, 40, 0.94)',
-  shadow: 'rgba(0, 0, 0, 0.35)',
+  bg: '#12182A',
+  bgElevated: '#171F34',
+  surface: '#1C2540',
+  surface2: '#263352',
+  text: '#EEF2FA',
+  textMuted: '#B8C4D9',
+  textSoft: '#8E9CB4',
+  border: '#33415C',
+  primary: '#8BB0FF',
+  primaryDeep: '#5B86F5',
+  primarySoft: 'rgba(139, 176, 255, 0.16)',
+  accent: '#C4A6FF',
+  warning: '#E8B45A',
+  warningSoft: 'rgba(232, 180, 90, 0.16)',
+  danger: '#F08A98',
+  dangerSoft: 'rgba(240, 138, 152, 0.16)',
+  success: '#6ED6A8',
+  successSoft: 'rgba(110, 214, 168, 0.14)',
+  overlay: 'rgba(6, 10, 22, 0.64)',
+  nav: '#171F34',
+  shadow: 'rgba(0, 0, 0, 0.32)',
+  onPrimary: '#F5F8FF',
 };
 
 export type Palette = typeof light;
 
 export const gradient = {
-  brand: ['#08185E', '#1C36B4', '#5B2BD4', '#D52C79'] as const,
-  button: ['#2448DC', '#6A38E5', '#168BFF'] as const,
-  hero: ['#102B9A', '#3233C9', '#7437DF'] as const,
-  auth: ['#0B258D', '#4931CE', '#A531C5'] as const,
-  mark: ['#7B91FF', '#334BFF', '#6036DF', '#F32E7A'] as const,
+  brand: ['#1E4BB8', '#2E5FE0', '#5B3ED4'] as const,
+  button: ['#2A58D8', '#3D6AE8', '#5B45D4'] as const,
+  hero: ['#244CC0', '#2E5FE0', '#5B3ED4'] as const,
+  auth: ['#1E4BB8', '#2E5FE0', '#5B3ED4'] as const,
+  mark: ['#8BB0FF', '#2E5FE0', '#5B3ED4'] as const,
   green: ['#154832', '#1F6B4A', '#357F5E'] as const,
 };
 
 export const toneColor: Record<string, string> = {
-  orange: '#EE6C28',
-  blue: '#3078A3',
-  red: '#D53637',
-  indigo: '#4146A0',
-  green: '#264BD6',
-  purple: '#6B37DD',
+  orange: '#D96A24',
+  blue: '#2F74A8',
+  red: '#C43B3C',
+  indigo: '#3F4AA8',
+  green: '#2F5FE0',
+  purple: '#6A4AD4',
+  slate: '#5A6A84',
 };
 
 export const radius = { sm: 12, md: 16, lg: 20, xl: 28, pill: 999 };
 export const space = { xs: 6, sm: 10, md: 16, lg: 24, xl: 32 };
+
+export function fade(color: string, alpha: number) {
+  if (color.startsWith('rgba')) {
+    return color.replace(/rgba\((\d+),\s*(\d+),\s*(\d+),\s*[\d.]+\)/, `rgba($1,$2,$3,${alpha})`);
+  }
+  const hex = color.replace('#', '');
+  if (hex.length !== 6) return color;
+  const n = parseInt(hex, 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${alpha})`;
+}
