@@ -1,3 +1,4 @@
+import { useBills } from '../services/bill-context';
 import { CalendarDays, ChevronLeft, ChevronRight } from 'lucide-react-native';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
@@ -13,11 +14,9 @@ const monthFormat = new Intl.DateTimeFormat('en-PH', { month: 'long', year: 'num
 const dayKey = (date: Date) => `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
 
 export function CalendarScreen({ go, t, c, householdId }: { go: (screen: Screen) => void; t: Copy; c: Palette; householdId: string }) {
+  const [selectedDate, setSelectedDate] = useState<string | null>(null);
   const [month, setMonth] = useState(() => new Date(new Date().getFullYear(), new Date().getMonth(), 1));
-  const [bills, setBills] = useState<DbBill[]>([]);
-  const load = useCallback(async () => setBills(await fetchHouseholdBills(householdId)), [householdId]);
-  useEffect(() => { void load(); }, [load]);
-  useRealtimeBills(householdId, { onInsert: () => void load(), onUpdate: () => void load() });
+  const { bills, selectBill, loading } = useBills();
   const billsByDate = useMemo(() => bills.reduce<Record<string, DbBill[]>>((all, bill) => {
     (all[bill.due_date] ||= []).push(bill); return all;
   }, {}), [bills]);
@@ -36,26 +35,26 @@ export function CalendarScreen({ go, t, c, householdId }: { go: (screen: Screen)
         <CinematicHero pose="calendar" height={160} c={c} title="Stay ahead of due dates" subtitle="Every household bill appears on its due date." />
         <Card c={c} style={{ padding: 14, marginTop: 14 }}>
           <View style={styles.monthBar}>
-            <Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1))} style={[styles.arrow, { backgroundColor: c.surface2 }]}><ChevronLeft size={18} color={c.text} /></Pressable>
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>{monthFormat.format(month)}</Text>
-            <Pressable onPress={() => setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1))} style={[styles.arrow, { backgroundColor: c.surface2 }]}><ChevronRight size={18} color={c.text} /></Pressable>
+            <Pressable accessibilityLabel="Previous month" onPress={() => { setSelectedDate(null); setMonth(new Date(month.getFullYear(), month.getMonth() - 1, 1)); }} style={[styles.arrow, { backgroundColor: c.surface2 }]}><ChevronLeft size={18} color={c.text} /></Pressable>
+            <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{monthFormat.format(month)}</Text>
+            <Pressable accessibilityLabel="Next month" onPress={() => { setSelectedDate(null); setMonth(new Date(month.getFullYear(), month.getMonth() + 1, 1)); }} style={[styles.arrow, { backgroundColor: c.surface2 }]}><ChevronRight size={18} color={c.text} /></Pressable>
           </View>
-          <View style={styles.grid}>{week.map((name) => <Text key={name} style={{ width: '14.285%', color: c.textMuted, textAlign: 'center', fontSize: 10, fontWeight: '800' }}>{name}</Text>)}</View>
+          <View style={styles.grid}>{week.map((name) => <Text key={name} style={{ width: '14.285%', color: c.textMuted, textAlign: 'center', fontSize: 10, fontWeight: '600' }}>{name}</Text>)}</View>
           <View style={styles.grid}>{cells.map((day, index) => {
             if (day < 1 || day > count) return <View key={`empty-${index}`} style={styles.day} />;
             const key = dayKey(new Date(month.getFullYear(), month.getMonth(), day)); const due = billsByDate[key] || []; const isToday = key === today;
-            return <View key={key} style={[styles.day, isToday && { backgroundColor: c.primarySoft, borderRadius: 12 }]}><Text style={{ color: isToday ? c.primary : c.text, fontWeight: isToday ? '900' : '600', fontSize: 12 }}>{day}</Text>{due.slice(0, 2).map((bill) => <View key={bill.id} style={[styles.dot, { backgroundColor: bill.status === 'paid' ? c.success : c.primary }]} />)}</View>;
+            return <Pressable accessibilityRole="button" accessibilityLabel={`${key}, ${due.length} bills`} accessibilityState={{ selected: selectedDate === key }} onPress={() => setSelectedDate(selectedDate === key ? null : key)} key={key} style={[styles.day, selectedDate === key && { borderWidth: 1, borderColor: c.primary, borderRadius: 12 }, isToday && { backgroundColor: c.primarySoft, borderRadius: 12 }]}><Text style={{ color: isToday ? c.primary : c.text, fontWeight: isToday ? '900' : '600', fontSize: 12 }}>{day}</Text>{due.slice(0, 2).map((bill) => <View key={bill.id} style={[styles.dot, { backgroundColor: bill.status === 'paid' ? c.success : c.primary }]} />)}</Pressable>;
           })}</View>
         </Card>
-        <View style={styles.heading}><CalendarDays size={16} color={c.primary} /><Text style={{ color: c.text, fontWeight: '800', fontSize: 16 }}>Due this month</Text></View>
-        {currentMonthBills.length ? currentMonthBills.map((bill) => {
+        <View style={styles.heading}><CalendarDays size={16} color={c.primary} /><Text style={{ color: c.text, fontWeight: '600', fontSize: 16 }}>{selectedDate ? `Due ${selectedDate}` : 'Due this month'}</Text></View>
+        {(selectedDate ? billsByDate[selectedDate] || [] : currentMonthBills).length ? (selectedDate ? billsByDate[selectedDate] || [] : currentMonthBills).map((bill) => {
           const display = formatBillDisplay(bill);
-          return <Card key={bill.id} c={c} onPress={() => go('bill-detail')} style={styles.bill}>
+          return <Card key={bill.id} c={c} onPress={() => { selectBill(bill.id); go('bill-detail'); }} style={styles.bill}>
             <ProviderMark tone={display.tone} letter={display.provider[0]} />
-            <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '800' }}>{display.provider}</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 2 }}>Due {display.dueDateShort} · {display.amount}</Text></View>
+            <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '600' }}>{display.provider}</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 2 }}>Due {display.dueDateShort} · {display.amount}</Text></View>
             <StatusPill status={display.status} c={c} />
           </Card>;
-        }) : <View style={[styles.empty, { backgroundColor: c.surface, borderColor: c.border }]}><CalendarDays size={24} color={c.primary} /><Text style={{ color: c.text, fontWeight: '800', marginTop: 8 }}>No due dates this month</Text><Text style={{ color: c.textMuted, textAlign: 'center', fontSize: 12, marginTop: 3 }}>Add a household bill and its due date will appear here.</Text></View>}
+        }) : <View style={[styles.empty, { backgroundColor: c.surface, borderColor: c.border }]}><CalendarDays size={24} color={c.primary} /><Text style={{ color: c.text, fontWeight: '600', marginTop: 8 }}>No due dates this month</Text><Text style={{ color: c.textMuted, textAlign: 'center', fontSize: 12, marginTop: 3 }}>Add a household bill and its due date will appear here.</Text></View>}
       </ScreenScroll>
     </View>
   );

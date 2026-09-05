@@ -1,3 +1,10 @@
+import * as Clipboard from 'expo-clipboard';
+import { Benefits } from '../components/Benefits';
+import { checkAndCreateDueDateReminders } from '../services/notifications';
+import { useRealtimeHouseholdMembers } from '../services/realtime';
+import { registerForPushNotifications, scheduleAllDueReminders } from '../services/push';
+import { useBills } from '../services/bill-context';
+import { openPaymentDestination } from '../services/external';
 import * as Sharing from 'expo-sharing';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
@@ -5,7 +12,7 @@ import {
   Languages, LogOut, Moon, Pencil, Play, ShieldCheck, Sun, Users, X,
 } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { AppHeader, BottomNav, BrandLogo, Card, CinematicHero, Field, InfoBanner, PrefSwitch, PrimaryButton, ScreenScroll } from '../components/ui';
 import { images } from '../data';
@@ -34,12 +41,12 @@ export function SettingsScreen({
           <Row icon={<CreditCard size={15} color={c.primary} />} label={t.settings.methods} value="GCash, Maya, BPI" onPress={() => go('payment-methods')} c={c} />
         </Group>
         <Group title={t.settings.preferences} c={c}>
-          <Row icon={<Bell size={15} color={c.primary} />} label={t.settings.notifications} value={t.settings.on} onPress={() => go('notification-settings')} c={c} />
+          <Row icon={<Bell size={15} color={c.primary} />} label={t.settings.notifications} onPress={() => go('notification-settings')} c={c} />
           <Row icon={<Languages size={15} color={c.primary} />} label={t.settings.language} value={t.langs[lang].native} onPress={() => go('language')} c={c} />
           <Row icon={dark ? <Moon size={15} color={c.primary} /> : <Sun size={15} color={c.primary} />} label={t.settings.appearance} value={dark ? t.settings.dark : t.settings.light} onPress={() => go('appearance')} c={c} />
         </Group>
         <Group title={t.settings.yourData} c={c}>
-          <Row icon={<ShieldCheck size={15} color={c.primary} />} label={t.settings.privacy} value="Supabase RLS" onPress={() => go('privacy')} c={c} />
+          <Row icon={<ShieldCheck size={15} color={c.primary} />} label={t.settings.privacy} value="Household access" onPress={() => go('privacy')} c={c} />
           <Row icon={<Download size={15} color={c.primary} />} label={t.settings.export} onPress={() => go('export-data')} c={c} />
           <Row icon={<History size={15} color={c.primary} />} label={t.settings.activity} onPress={() => go('activity')} c={c} />
         </Group>
@@ -48,7 +55,7 @@ export function SettingsScreen({
         </Group>
         <Pressable onPress={onLogout} style={[styles.logout, { borderColor: c.border, backgroundColor: c.surface }]}>
           <LogOut size={16} color={c.danger} />
-          <Text style={{ color: c.danger, fontWeight: '800' }}>{t.settings.logout}</Text>
+          <Text style={{ color: c.danger, fontWeight: '600' }}>{t.settings.logout}</Text>
         </Pressable>
         <View style={{ alignItems: 'center', marginTop: 22 }}>
           <BrandLogo c={c} />
@@ -66,7 +73,7 @@ export function LanguageScreen({ go, t, c, lang, setLang }: { go: (s: Screen) =>
       <AppHeader title={t.language.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
         <CinematicHero pose="profile" height={132} c={c} title={t.language.choose} subtitle={t.language.body} />
-        <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.language.choose}</Text>
+        <Text style={{ color: c.text, fontSize: 22, fontWeight: '600' }}>{t.language.choose}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.language.body}</Text>
         <Card c={c} style={{ paddingHorizontal: 14, paddingVertical: 0 }}>
           {languageOptions.map((opt) => {
@@ -75,7 +82,7 @@ export function LanguageScreen({ go, t, c, lang, setLang }: { go: (s: Screen) =>
             return (
               <Pressable key={opt.id} onPress={() => setLang(opt.id)} style={[styles.choice, { borderBottomColor: c.border }]}>
                 <View style={{ flex: 1 }}>
-                  <Text style={{ color: c.text, fontWeight: '800' }}>{meta.native}</Text>
+                  <Text style={{ color: c.text, fontWeight: '600' }}>{meta.native}</Text>
                   <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 3 }}>{meta.sample}</Text>
                 </View>
                 <View style={[styles.radio, { borderColor: selected ? c.primary : c.border, backgroundColor: selected ? c.primary : 'transparent' }]}>
@@ -99,7 +106,7 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
       <AppHeader title={t.appearance.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
         <CinematicHero pose="profile" height={132} c={c} title={t.appearance.make} subtitle={t.appearance.body} />
-        <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.appearance.make}</Text>
+        <Text style={{ color: c.text, fontSize: 22, fontWeight: '600' }}>{t.appearance.make}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.appearance.body}</Text>
         <View style={{ flexDirection: 'row', gap: 11, marginBottom: 15 }}>
           <Pressable onPress={() => setDark(false)} style={[styles.themeCard, { borderColor: !dark ? c.primary : 'transparent', backgroundColor: c.surface }]}>
@@ -108,7 +115,7 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
               <View style={styles.line} /><View style={[styles.line, { width: '65%' }]} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 }}>
-              <Sun size={13} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.settings.light}</Text>
+              <Sun size={13} color={c.text} /><Text style={{ color: c.text, fontWeight: '600' }}>{t.settings.light}</Text>
             </View>
             {!dark && <CheckCircle2 size={16} color={c.primary} style={{ position: 'absolute', right: 12, bottom: 11 }} />}
           </Pressable>
@@ -118,7 +125,7 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
               <View style={[styles.line, { backgroundColor: '#263352' }]} /><View style={[styles.line, { width: '65%', backgroundColor: '#263352' }]} />
             </View>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6, padding: 8 }}>
-              <Moon size={13} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.settings.dark}</Text>
+              <Moon size={13} color={c.text} /><Text style={{ color: c.text, fontWeight: '600' }}>{t.settings.dark}</Text>
             </View>
             {dark && <CheckCircle2 size={16} color={c.primary} style={{ position: 'absolute', right: 12, bottom: 11 }} />}
           </Pressable>
@@ -127,7 +134,7 @@ export function AppearanceScreen({ go, t, c, dark, setDark }: { go: (s: Screen) 
           <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
             <View style={[styles.iconSoft, { backgroundColor: c.primarySoft }]}><Moon size={17} color={c.primary} /></View>
             <View>
-              <Text style={{ color: c.text, fontWeight: '800' }}>{t.appearance.useDark}</Text>
+              <Text style={{ color: c.text, fontWeight: '600' }}>{t.appearance.useDark}</Text>
               <Text style={{ color: c.textMuted, fontSize: 12 }}>{t.appearance.useDarkHint}</Text>
             </View>
           </View>
@@ -146,7 +153,7 @@ export function PrivacyScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
         <CinematicHero pose="profile" height={132} c={c} title={t.privacy.hero} subtitle={t.privacy.heroBody} />
         <View style={[styles.privacyHero, { backgroundColor: c.primarySoft }]}>
           <ShieldCheck size={44} color={c.primary} />
-          <Text style={{ color: c.text, fontSize: 20, fontWeight: '800', marginTop: 10, textAlign: 'center' }}>{t.privacy.hero}</Text>
+          <Text style={{ color: c.text, fontSize: 20, fontWeight: '600', marginTop: 10, textAlign: 'center' }}>{t.privacy.hero}</Text>
           <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 6 }}>{t.privacy.heroBody}</Text>
         </View>
         {[
@@ -157,7 +164,7 @@ export function PrivacyScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
           <View key={String(title)} style={[styles.privacyRow, { borderBottomColor: c.border }]}>
             <Icon size={19} color={c.primary} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontWeight: '800' }}>{title as string}</Text>
+              <Text style={{ color: c.text, fontWeight: '600' }}>{title as string}</Text>
               <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 2 }}>{body as string}</Text>
             </View>
           </View>
@@ -171,10 +178,10 @@ export function PrivacyScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; 
 }
 
 export function EditProfileScreen({
-  go, t, c, userId, userName, setUserName,
+  go, t, c, userId, userName, setUserName, email,
 }: {
   go: (s: Screen) => void; t: Copy; c: Palette; userId: string;
-  userName: string; setUserName: (n: string) => void;
+  userName: string; setUserName: (n: string) => void; email: string;
 }) {
   const [name, setName] = useState(userName);
   const [saving, setSaving] = useState(false);
@@ -198,7 +205,7 @@ export function EditProfileScreen({
         <CinematicHero pose="profile" height={150} c={c} title={t.profile.edit} subtitle={t.profile.display} />
         <Card c={c} style={{ gap: 12 }}>
           <Labeled c={c} label={t.profile.display} value={name} onChange={setName} />
-          <Labeled c={c} label={t.profile.email} value="Connected Supabase account" editable={false} />
+          <Labeled c={c} label={t.profile.email} value={email} editable={false} />
           {message ? <Text style={{ color: c.success }}>{message}</Text> : null}
           <PrimaryButton title={t.profile.save} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
         </Card>
@@ -234,18 +241,18 @@ export function HouseholdSetupScreen({
         <CinematicHero pose="home" height={142} c={c} title="One shared home" subtitle="Create your household or join the people you live with." />
         <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
           <Users size={42} color={c.primary} />
-          <Text style={{ color: c.text, fontSize: 23, fontWeight: '800', marginTop: 10 }}>One shared home, one clear view.</Text>
+          <Text style={{ color: c.text, fontSize: 23, fontWeight: '600', marginTop: 10 }}>One shared home, one clear view.</Text>
           <Text style={{ color: c.textMuted, textAlign: 'center', lineHeight: 19 }}>Create a household as its admin, or join one your organizer already created.</Text>
         </View>
         {error ? <InfoBanner c={c} icon={<ShieldCheck size={15} color={c.danger} />}>{error}</InfoBanner> : null}
         <Card c={c} style={{ gap: 13, marginBottom: 13 }}>
-          <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>Create a household</Text>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>Create a household</Text>
           <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18 }}>You’ll be the admin and can share the Household ID with family members.</Text>
           <Field c={c} label="Household name" value={newName} onChangeText={setNewName} placeholder="e.g. Dela Cruz Household" autoCapitalize="words" icon={<Users size={17} color={c.primary} />} />
           <PrimaryButton title={busy === 'create' ? 'Creating household…' : 'Create household'} loading={busy === 'create'} onPress={() => void run('create')} c={c} />
         </Card>
         <Card c={c} style={{ gap: 13 }}>
-          <Text style={{ color: c.text, fontSize: 17, fontWeight: '800' }}>Join an existing household</Text>
+          <Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>Join an existing household</Text>
           <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18 }}>Enter the 8-character Household ID from the admin, or the exact household name.</Text>
           <Field c={c} label="Household ID or name" value={lookup} onChangeText={setLookup} placeholder="e.g. A1B2C3D4" autoCapitalize="characters" autoCorrect={false} icon={<Users size={17} color={c.primary} />} />
           <PrimaryButton title={busy === 'join' ? 'Joining household…' : 'Join household'} loading={busy === 'join'} onPress={() => void run('join')} c={c} />
@@ -260,9 +267,10 @@ export function HouseholdScreen({ go, t, c, userId, household }: { go: (s: Scree
   const [error, setError] = useState('');
   const load = async () => {
     if (!household) return;
-    setMembers(await fetchHouseholdUsers(household.id));
+    try { setMembers(await fetchHouseholdUsers(household.id)); } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not load household members.'); }
   };
   useEffect(() => { void load(); }, [household?.id]);
+  useRealtimeHouseholdMembers(household?.id || '', { onInsert: () => void load(), onDelete: () => void load() });
   const remove = async (member: HouseholdUser) => {
     setError('');
     try { await removeHouseholdUser(member.user_id); await load(); }
@@ -278,13 +286,14 @@ export function HouseholdScreen({ go, t, c, userId, household }: { go: (s: Scree
         <View style={{ flexDirection: 'row', gap: 12, alignItems: 'center', marginBottom: 12 }}>
           <View style={[styles.iconSoft, { width: 44, height: 44, borderRadius: 14, backgroundColor: c.primarySoft }]}><Users size={20} color={c.primary} /></View>
           <View>
-            <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>{household.name}</Text>
+            <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{household.name}</Text>
             <Text style={{ color: c.textMuted, fontSize: 12 }}>{isAdmin ? 'You administer this household.' : 'You are a household member.'}</Text>
           </View>
         </View>
         <Card c={c} style={{ marginBottom: 12, backgroundColor: c.primarySoft }}>
-          <Text style={{ color: c.primary, fontSize: 11, fontWeight: '800', letterSpacing: 1 }}>HOUSEHOLD ID</Text>
-          <Text selectable style={{ color: c.text, fontSize: 24, fontWeight: '900', letterSpacing: 2, marginTop: 4 }}>{household.join_id}</Text>
+          <Text style={{ color: c.primary, fontSize: 11, fontWeight: '600', letterSpacing: 1 }}>HOUSEHOLD ID</Text>
+          <Pressable accessibilityLabel="Copy household join code" onPress={() => void Clipboard.setStringAsync(household.join_id).catch(() => setError('Could not copy the join code.'))}><Text style={{ color: c.primary, marginTop: 10 }}>Copy join code</Text></Pressable>
+          <Text selectable style={{ color: c.text, fontSize: 24, fontWeight: '700', letterSpacing: 2, marginTop: 4 }}>{household.join_id}</Text>
           <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 6 }}>Share this ID so family members can join this exact household.</Text>
         </Card>
         {error ? <InfoBanner c={c} icon={<ShieldCheck size={15} color={c.danger} />}>{error}</InfoBanner> : null}
@@ -294,9 +303,9 @@ export function HouseholdScreen({ go, t, c, userId, household }: { go: (s: Scree
             const name = member.profile?.full_name || 'Household member';
             const isYou = member.user_id === userId;
             return <View key={member.user_id} style={[styles.member, { borderBottomColor: c.border }]}>
-              <View style={[styles.memberAv, { backgroundColor: c.primarySoft }]}><Text style={{ color: c.primary, fontWeight: '800' }}>{name.split(' ').map((p) => p[0]).join('').slice(0, 2)}</Text></View>
+              <View style={[styles.memberAv, { backgroundColor: c.primarySoft }]}><Text style={{ color: c.primary, fontWeight: '600' }}>{name.split(' ').map((p) => p[0]).join('').slice(0, 2)}</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontWeight: '800' }}>{name}</Text>
+                <Text style={{ color: c.text, fontWeight: '600' }}>{name}</Text>
                 <Text style={{ color: c.textMuted, fontSize: 12 }}>{member.role === 'admin' ? 'Admin' : t.household.member}</Text>
                 {isYou && <Text style={{ color: c.primary, fontSize: 11, fontWeight: '700', marginTop: 2 }}>{t.household.you}</Text>}
               </View>
@@ -315,6 +324,7 @@ export function HouseholdScreen({ go, t, c, userId, household }: { go: (s: Scree
 }
 
 export function PaymentMethodsScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
+  const [error, setError] = useState('');
   const methods = [['G', 'GCash'], ['M', 'Maya'], ['B', 'BPI / bank app']];
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -323,59 +333,76 @@ export function PaymentMethodsScreen({ go, t, c }: { go: (s: Screen) => void; t:
         <CinematicHero pose="bills" height={136} c={c} title={t.payments.hero} subtitle={t.payments.body} />
         <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
           <CreditCard size={43} color={c.primary} />
-          <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', marginTop: 10 }}>{t.payments.hero}</Text>
+          <Text style={{ color: c.text, fontSize: 22, fontWeight: '600', marginTop: 10 }}>{t.payments.hero}</Text>
           <Text style={{ color: c.textMuted, textAlign: 'center' }}>{t.payments.body}</Text>
         </View>
         <InfoBanner c={c}>{t.payments.banner}</InfoBanner>
+        {error ? <InfoBanner c={c} tone="danger">{error}</InfoBanner> : null}
         <Card c={c} style={{ paddingHorizontal: 14, paddingVertical: 0, marginBottom: 15 }}>
           {methods.map((method) => (
-            <Pressable key={method[1]} onPress={() => go('bill-detail')} style={[styles.method, { borderBottomColor: c.border }]}>
-              <View style={styles.methodMark}><Text style={{ color: '#fff', fontWeight: '900' }}>{method[0]}</Text></View>
+            <Pressable accessibilityRole="button" key={method[1]} onPress={() => { setError(''); void openPaymentDestination(method[0] === 'B' ? 'BPI' : method[1]).catch(reason => setError(reason.message)); }} style={[styles.method, { borderBottomColor: c.border }]}>
+              <View style={styles.methodMark}><Text style={{ color: '#fff', fontWeight: '700' }}>{method[0]}</Text></View>
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontWeight: '800' }}>{method[1]}</Text>
+                <Text style={{ color: c.text, fontWeight: '600' }}>{method[1]}</Text>
                 <Text style={{ color: c.textMuted, fontSize: 12 }}>{t.payments.opens}</Text>
               </View>
               <ChevronRight size={14} color={c.primary} />
             </Pressable>
           ))}
         </Card>
-        <PrimaryButton title={t.payments.tryFlow} onPress={() => go('bill-detail')} c={c} icon={<ChevronRight size={16} color="#fff" />} />
+        <PrimaryButton title={t.payments.tryFlow} onPress={() => go('bills')} c={c} icon={<ChevronRight size={16} color="#fff" />} />
       </ScreenScroll>
     </View>
   );
 }
 
 export function NotificationSettingsScreen({
-  go, t, c, userId, draft,
-}: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; draft: OnboardingDraft }) {
-  const [prefs, setPrefs] = useState({ due_soon: draft.dueSoon, weekly_summary: draft.weeklySummary, payment_updates: true, government_deadlines: draft.lingkodDeadlines });
+  go, t, c, userId, draft, householdId,
+}: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; draft: OnboardingDraft; householdId: string }) {
+  const [prefs, setPrefs] = useState({ due_soon: draft.dueSoon, weekly_summary: draft.weeklySummary, payment_updates: true, government_deadlines: draft.lingkodDeadlines, load_reminders: draft.loadReminders });
   const [saved, setSaved] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState('');
+  const [deviceMessage, setDeviceMessage] = useState('');
+  useEffect(() => { setSaved(false); }, [prefs]);
   useEffect(() => {
     if (!supabase || !userId) return;
-    void supabase.from('notification_preferences').select('due_soon,weekly_summary,payment_updates,government_deadlines').eq('user_id', userId).maybeSingle().then(({ data }) => {
-      if (data) setPrefs(data);
-    });
+    void supabase.from('notification_preferences').select('due_soon,weekly_summary,payment_updates,government_deadlines,load_reminders').eq('user_id', userId).maybeSingle().then(({ data, error }) => { if (error) setError(error.message); else if (data) setPrefs(data); });
   }, [userId]);
   const save = async () => {
-    if (supabase) await supabase.from('notification_preferences').upsert({ user_id: userId, ...prefs });
-    setSaved(true);
-    setTimeout(() => setSaved(false), 1800);
+    if (!supabase || busy) return;
+    setBusy(true); setError(''); setSaved(false);
+    try {
+      const { error } = await supabase.from('notification_preferences').upsert({ user_id: userId, ...prefs });
+      if (error) throw new Error(error.message);
+      if (householdId) await Promise.all([scheduleAllDueReminders(householdId, userId), checkAndCreateDueDateReminders(userId, householdId)]);
+      setSaved(true);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save preferences.'); }
+    finally { setBusy(false); }
+  };
+  const enableDevice = async () => {
+    try { await registerForPushNotifications(userId); if (householdId) await scheduleAllDueReminders(householdId, userId); setDeviceMessage('Device reminders enabled.'); }
+    catch (reason) { setDeviceMessage(reason instanceof Error ? reason.message : 'Could not enable device reminders.'); }
   };
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
       <AppHeader title={t.notifSettings.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
+        {error ? <InfoBanner c={c} tone="danger">{error}</InfoBanner> : null}
         <CinematicHero pose="calendar" height={136} c={c} title={t.notifSettings.hero} subtitle={t.notifSettings.body} />
-        <Text style={{ color: c.text, fontSize: 22, fontWeight: '800' }}>{t.notifSettings.hero}</Text>
+        <Text style={{ color: c.text, fontSize: 22, fontWeight: '600' }}>{t.notifSettings.hero}</Text>
         <Text style={{ color: c.textMuted, marginBottom: 16 }}>{t.notifSettings.body}</Text>
         <Card c={c} style={{ paddingHorizontal: 14 }}>
           <PrefSwitch title={t.onboarding.dueSoon} hint={t.onboarding.dueSoonHint} value={prefs.due_soon} onValueChange={(v) => setPrefs({ ...prefs, due_soon: v })} c={c} />
-          <PrefSwitch title={t.onboarding.weekly} hint={t.onboarding.weeklyHint} value={prefs.weekly_summary} onValueChange={(v) => setPrefs({ ...prefs, weekly_summary: v })} c={c} />
-          <PrefSwitch title={t.onboarding.loadPref} hint={t.onboarding.loadPrefHint} value={prefs.payment_updates} onValueChange={(v) => setPrefs({ ...prefs, payment_updates: v })} c={c} />
+
+          <PrefSwitch title="Weekly overview" hint="A weekly in-app summary of bills due in the next seven days." value={prefs.weekly_summary} onValueChange={v => setPrefs({ ...prefs, weekly_summary: v })} c={c} />
+          <PrefSwitch title={t.onboarding.loadPref} hint={t.onboarding.loadPrefHint} value={prefs.load_reminders} onValueChange={v => setPrefs({ ...prefs, load_reminders: v })} c={c} />
+          <PrefSwitch title="Payment updates" hint="When someone in your household records a payment." value={prefs.payment_updates} onValueChange={(v) => setPrefs({ ...prefs, payment_updates: v })} c={c} />
           <PrefSwitch title={t.onboarding.lingkodPref} hint={t.onboarding.lingkodPrefHint} value={prefs.government_deadlines} onValueChange={(v) => setPrefs({ ...prefs, government_deadlines: v })} c={c} />
         </Card>
         <View style={{ marginTop: 18 }}>
-          <PrimaryButton title={saved ? t.notifSettings.saved : t.notifSettings.save} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
+          <PrimaryButton loading={busy} title={saved ? t.notifSettings.saved : t.notifSettings.save} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
+          <View style={{ marginTop: 16 }}>{Platform.OS === 'web' ? <InfoBanner c={c}>In-app reminders are available here. Enable device reminders from the iOS or Android app.</InfoBanner> : <PrimaryButton title="Enable device reminders" onPress={() => void enableDevice()} c={c} />}{deviceMessage ? <Text style={{ color: c.textMuted, marginTop: 12 }}>{deviceMessage}</Text> : null}</View>
         </View>
       </ScreenScroll>
     </View>
@@ -385,26 +412,34 @@ export function NotificationSettingsScreen({
 export function ExportDataScreen({ go, t, c, userId, householdId }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string }) {
   const [exporting, setExporting] = useState(false);
   const [done, setDone] = useState(false);
+  const [error, setError] = useState('');
   const download = async () => {
-    setExporting(true);
-    let payload: unknown = { profile: {}, bills: [], activity: [], exported_at: new Date().toISOString() };
-    if (supabase && userId) {
-      const [profileResult, billResult, activityResult] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+    if (!supabase || exporting) return;
+    setExporting(true); setDone(false); setError('');
+    try {
+      const results = await Promise.all([
+        supabase.from('profiles').select('id,full_name,household_name,preferred_language,appearance,created_at').eq('id', userId).single(),
         supabase.from('bills').select('*').eq('household_id', householdId),
         supabase.from('activity_events').select('*').eq('household_id', householdId),
+        supabase.from('notification_preferences').select('*').eq('user_id', userId).maybeSingle(),
       ]);
-      payload = { profile: profileResult.data, bills: billResult.data, activity: activityResult.data, exported_at: new Date().toISOString() };
-    }
-    const FileSystem = await import('expo-file-system/legacy').catch(async () => import('expo-file-system'));
-    const dir = (FileSystem as { cacheDirectory?: string }).cacheDirectory ?? '';
-    const path = `${dir}bayarin-household-export.json`;
-    if ('writeAsStringAsync' in FileSystem) {
-      await (FileSystem as { writeAsStringAsync: (p: string, d: string) => Promise<void> }).writeAsStringAsync(path, JSON.stringify(payload, null, 2));
-      if (await Sharing.isAvailableAsync()) await Sharing.shareAsync(path);
-    }
-    setExporting(false);
-    setDone(true);
+      const failure = results.find(result => result.error)?.error;
+      if (failure) throw new Error(failure.message);
+      const json = JSON.stringify({ profile: results[0].data, bills: results[1].data, activity: results[2].data, preferences: results[3].data, exported_at: new Date().toISOString() }, null, 2);
+      if (Platform.OS === 'web') {
+        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
+        const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'bayarin-household-export.json'; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
+      } else {
+        const FileSystem = await import('expo-file-system/legacy');
+        if (!FileSystem.cacheDirectory) throw new Error('Local file storage is unavailable.');
+        const path = FileSystem.cacheDirectory + 'bayarin-household-export.json';
+        await FileSystem.writeAsStringAsync(path, json);
+        if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
+        await Sharing.shareAsync(path, { mimeType: 'application/json' });
+      }
+      setDone(true);
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not export your records.'); }
+    finally { setExporting(false); }
   };
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -413,17 +448,18 @@ export function ExportDataScreen({ go, t, c, userId, householdId }: { go: (s: Sc
         <CinematicHero pose="profile" height={136} c={c} title={t.export.hero} subtitle={t.export.body} />
         <View style={[styles.centerHero, { backgroundColor: c.primarySoft }]}>
           <Download size={43} color={c.primary} />
-          <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', marginTop: 10 }}>{t.export.hero}</Text>
+          <Text style={{ color: c.text, fontSize: 22, fontWeight: '600', marginTop: 10 }}>{t.export.hero}</Text>
           <Text style={{ color: c.textMuted, textAlign: 'center' }}>{t.export.body}</Text>
         </View>
         <Card c={c} style={{ paddingHorizontal: 14, marginBottom: 15 }}>
           {[[t.export.profile, t.export.profileHint], [t.export.bills, t.export.billsHint], [t.export.activity, t.export.activityHint]].map(([title, hint]) => (
             <View key={title} style={[styles.exportRow, { borderBottomColor: c.border }]}>
               <Check size={17} color={c.success} />
-              <View><Text style={{ color: c.text, fontWeight: '800' }}>{title}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{hint}</Text></View>
+              <View><Text style={{ color: c.text, fontWeight: '600' }}>{title}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{hint}</Text></View>
             </View>
           ))}
         </Card>
+        {error ? <InfoBanner c={c} tone="danger">{error}</InfoBanner> : null}
         <PrimaryButton title={done ? t.export.again : t.export.download} loading={exporting} onPress={() => void download()} c={c} icon={<Download size={16} color="#fff" />} />
         <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 12 }}>{t.export.legal}</Text>
       </ScreenScroll>
@@ -437,22 +473,15 @@ export function AboutScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c:
       <AppHeader title={t.about.title} onBack={() => go('settings')} c={c} />
       <ScreenScroll>
         <View style={styles.aboutHero}>
-          <Image source={images.story} style={StyleSheet.absoluteFill} />
+          <Image source={images.welcome} resizeMode="contain" style={{ position: 'absolute', top: -15, right: -35, width: 250, height: 260 }} />
           <LinearGradient colors={['rgba(4,10,55,0.1)', 'rgba(4,8,36,0.92)']} style={StyleSheet.absoluteFill} />
           <View style={{ position: 'absolute', left: 18, right: 18, bottom: 20 }}>
             <BrandLogo inverted c={c} />
-            <Text style={{ color: '#fff', fontSize: 25, fontWeight: '800', marginTop: 14 }}>{t.about.hero}</Text>
+            <Text style={{ color: '#fff', fontSize: 25, fontWeight: '600', marginTop: 14 }}>{t.about.hero}</Text>
             <Text style={{ color: '#DBE1FF', fontSize: 13, marginTop: 6 }}>{t.about.body}</Text>
           </View>
         </View>
-        <Card c={c} style={{ paddingHorizontal: 14, marginBottom: 15 }}>
-          {[[Calendarish, t.about.organize, t.about.organizeHint], [Bell, t.about.remind, t.about.remindHint], [ShieldCheck, t.about.protect, t.about.protectHint]].map(([Icon, title, hint]) => (
-            <View key={String(title)} style={[styles.exportRow, { borderBottomColor: c.border }]}>
-              <Icon size={19} color={c.primary} />
-              <View><Text style={{ color: c.text, fontWeight: '800' }}>{title as string}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{hint as string}</Text></View>
-            </View>
-          ))}
-        </Card>
+        <Benefits c={c} />
         <Text style={{ textAlign: 'center', color: c.textMuted, fontSize: 12, marginTop: 14 }}>{t.about.version}</Text>
       </ScreenScroll>
     </View>
@@ -466,7 +495,7 @@ function Calendarish({ size, color }: { size: number; color: string }) {
 function Group({ title, children, c }: { title: string; children: ReactNode; c: Palette }) {
   return (
     <View style={{ marginTop: 19 }}>
-      <Text style={{ color: c.textMuted, fontSize: 12, marginLeft: 4, marginBottom: 7, fontWeight: '800', letterSpacing: 0.3 }}>{title}</Text>
+      <Text style={{ color: c.textMuted, fontSize: 12, marginLeft: 4, marginBottom: 7, fontWeight: '600', letterSpacing: 0.3 }}>{title}</Text>
       <View style={{ backgroundColor: c.surface, borderRadius: 17, paddingHorizontal: 13, borderWidth: 1, borderColor: c.border }}>{children}</View>
     </View>
   );
@@ -483,7 +512,7 @@ function Row({ icon, label, value, onPress, c }: { icon: ReactNode; label: strin
       style={[styles.settingRow, { borderBottomColor: c.border }, anim]}
     >
       <View style={[styles.iconSoft, { backgroundColor: c.surface2 }]}>{icon}</View>
-      <Text style={{ color: c.text, fontWeight: '800', flex: 1 }}>{label}</Text>
+      <Text style={{ color: c.text, fontWeight: '600', flex: 1 }}>{label}</Text>
       {value ? <Text style={{ color: c.textMuted, fontSize: 12 }}>{value}</Text> : null}
       <ChevronRight size={14} color={c.textMuted} />
     </AnimatedPressable>

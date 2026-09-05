@@ -1,20 +1,9 @@
 export const images = {
-  welcome: require('../assets/welcome-hero-v2.png'),
-  story: require('../assets/bayarin-story-3d.png'),
-  onboarding: require('../assets/bayarin-onboarding-3d.png'),
-  auth: require('../assets/bayarin-auth-hero.jpg'),
-  avatar: require('../assets/bayarin-avatar-v1.png'),
-  mainAvatar: require('../assets/bayarin-main-avatar.png'),
-  homeHero: require('../assets/bayarin-home-hero.jpg'),
-  profileHero: require('../assets/bayarin-profile-hero.jpg'),
-  servicesHero: require('../assets/bayarin-services-hero-v2.jpg'),
-  calendarHero: require('../assets/bayarin-calendar-hero.png'),
-  calendarHeroV2: require('../assets/bayarin-calendar-hero-v3.jpg'),
-  billsHero: require('../assets/bayarin-bills-hero-v2.jpg'),
-  lingkodHero: require('../assets/bayarin-lingkod-hero-v2.jpg'),
+  welcome: require('../assets/reference-house.png'),
+  auth: require('../assets/reference-companion.png'),
+  avatar: require('../assets/reference-companion.png'),
+  homeHero: require('../assets/reference-bills.png'),
 };
-
-export const storyVideo = require('../assets/bayarin-story.mp4');
 
 export const providers = [
   { name: 'Meralco', mark: 'M', tone: 'orange' },
@@ -130,7 +119,7 @@ export const defaultOnboarding = {
 };
 
 export function langToStored(lang: 'en' | 'tl' | 'ceb') {
-  return lang === 'tl' ? 'Tagalog' : lang === 'ceb' ? 'Cebuano' : 'English';
+  return lang === 'tl' ? 'Filipino' : lang === 'ceb' ? 'Cebuano' : 'English';
 }
 
 export function storedToLang(value: string | null | undefined): 'en' | 'tl' | 'ceb' {

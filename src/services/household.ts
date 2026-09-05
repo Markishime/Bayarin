@@ -1,3 +1,4 @@
+import { billStatus } from './bill-rules';
 import { supabase } from '../lib/supabase';
 
 export type DbBill = {
@@ -18,6 +19,7 @@ export type DbBill = {
   payment_method: string | null;
   reference_number: string | null;
   paid_by: string | null;
+  receipt_path?: string | null;
   created_at: string;
   updated_at: string;
 };
@@ -42,7 +44,8 @@ export async function fetchHouseholdBills(householdId: string): Promise<DbBill[]
     .eq('household_id', householdId)
     .neq('status', 'archived')
     .order('due_date');
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data as DbBill[];
 }
 
@@ -54,7 +57,8 @@ export async function fetchHouseholdActivityEvents(householdId: string): Promise
     .eq('household_id', householdId)
     .order('created_at', { ascending: false })
     .limit(50);
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   return data as DbActivityEvent[];
 }
 
@@ -66,16 +70,16 @@ function safeDate(dateStr: string): Date {
 
 export function formatBillDisplay(bill: DbBill) {
   const provider = String(bill.provider).toUpperCase();
-  const status = String(bill.status)
+  const status = billStatus(bill)
     .split('_')
-    .map((w) => w[0].toUpperCase() + w.slice(1))
+    .map((w, i) => i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)
     .join(' ');
   const tone =
     provider === 'MERALCO'
       ? 'orange'
       : provider === 'MAYNILAD'
         ? 'blue'
-        : provider === 'PLDT'
+        : provider.startsWith('PLDT')
           ? 'red'
           : 'indigo';
   const dueDate = safeDate(bill.due_date);
@@ -115,10 +119,11 @@ export async function markBillPaid(
   paymentMethod: string,
   referenceNumber: string,
   paidBy: string,
+  receiptPath?: string,
 ) {
   if (!supabase) throw new Error('Supabase not configured');
   const now = new Date().toISOString();
-  const { error } = await supabase
+  const { data, error } = await supabase
     .from('bills')
     .update({
       status: 'paid',
@@ -126,10 +131,12 @@ export async function markBillPaid(
       payment_method: paymentMethod,
       reference_number: referenceNumber,
       paid_by: paidBy,
+      receipt_path: receiptPath,
     })
     .eq('id', billId)
-    .eq('household_id', householdId);
-  if (error) throw error;
+    .eq('household_id', householdId).not('status', 'in', '(paid,archived)')
+    .select('id').single();
+  if (error || !data) throw new Error(error?.message || 'This bill has already been paid or is no longer available.');
   return now;
 }
 
@@ -162,6 +169,7 @@ export async function getBillById(billId: string, householdId: string): Promise<
     .eq('id', billId)
     .eq('household_id', householdId)
     .maybeSingle();
-  if (error || !data) return null;
+  if (error) throw new Error(error.message);
+  if (!data) return null;
   return data as DbBill;
 }

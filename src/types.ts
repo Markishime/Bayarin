@@ -68,3 +68,4 @@ export const protectedScreens: Screen[] = [
   'settings', 'language', 'appearance', 'privacy', 'offline', 'empty', 'error',
   'household', 'household-setup', 'payment-methods', 'notification-settings', 'export-data', 'edit-profile',
 ];
+export type BillFilter = 'All' | 'Due soon' | 'Upcoming' | 'Paid' | 'Overdue';

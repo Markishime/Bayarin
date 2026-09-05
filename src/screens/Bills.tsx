@@ -1,14 +1,21 @@
+import { SuccessArt } from '../components/Artwork';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import { validAmount, validDate, localDateKey } from '../services/bill-rules';
+import { openPaymentDestination, providerUrl } from '../services/external';
+import { useBills } from '../services/bill-context';
 import * as Clipboard from 'expo-clipboard';
+import { chooseReceipt, uploadReceipt, receiptUrl, type Receipt } from '../services/receipts';
+import { Linking } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
-  ArrowUpRight, Bell, Check, ChevronRight, Copy as CopyIcon, Home, Info, Pencil, Plus,
+  Archive, MoreHorizontal, ReceiptText, Globe, ArrowUpRight, Bell, Check, ChevronRight, Copy as CopyIcon, Home, Info, Pencil, Plus,
   Search, Upload, Users, X,
 } from 'lucide-react-native';
-import { useEffect, useState, useCallback, type ReactNode } from 'react';
-import { Image, Modal, Pressable, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
+import { useEffect, useState, useRef, useCallback, type ReactNode } from 'react';
+import { Image, Modal, Pressable, ScrollView, StyleSheet, Switch, Text, TextInput, View } from 'react-native';
 import Animated, { Easing, interpolate, useAnimatedStyle, useSharedValue, withSpring, withTiming } from 'react-native-reanimated';
-import { AppHeader, BottomNav, Card, CinematicHero, Field, PrimaryButton, ProviderMark, ScreenScroll, SecondaryButton, StatusPill } from '../components/ui';
-import { images, type BillService, type ServiceProvider } from '../data';
+import { AppHeader, BottomNav, Card, CinematicHero, Field, PrimaryButton, ProviderMark, ScreenScroll, SecondaryButton, StatusPill, DataState, InfoBanner } from '../components/ui';
+import { images, billServices, type BillService, type ServiceProvider } from '../data';
 import type { Copy } from '../i18n';
 import { supabase, supabaseSetupMessage } from '../lib/supabase';
 import { useRealtimeBills } from '../services/realtime';
@@ -16,7 +23,7 @@ import { fetchHouseholdBills, formatBillDisplay, markBillPaid, createBillActivit
 import { fetchHouseholdUsers, type HouseholdUser } from '../services/households';
 import { createNotification, checkAndCreateDueDateReminders } from '../services/notifications';
 import { gradient, type Palette } from '../theme';
-import type { Screen } from '../types';
+import type { BillFilter, Screen } from '../types';
 
 const AnimatedPressable = Animated.createAnimatedComponent(Pressable);
 
@@ -61,28 +68,11 @@ function SearchInput({ c, value, onChangeText, placeholder, placeholderTextColor
 
 type BillDisplay = ReturnType<typeof formatBillDisplay>;
 
-export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string }) {
-  const [filter, setFilter] = useState('All');
+export function BillsScreen({ go, t, c, userId, householdId, initialFilter = 'All' }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string; initialFilter?: BillFilter }) {
+  const [filter, setFilter] = useState<string>(initialFilter);
   const [query, setQuery] = useState('');
-  const [userBills, setUserBills] = useState<BillDisplay[]>([]);
-  const [loading, setLoading] = useState(true);
-
-  const loadBills = useCallback(async () => {
-    const bills = await fetchHouseholdBills(householdId);
-    setUserBills(bills.map(formatBillDisplay));
-    setLoading(false);
-  }, [householdId]);
-
-  useEffect(() => { void loadBills(); }, [loadBills]);
-
-  useEffect(() => {
-    if (userId && householdId) void checkAndCreateDueDateReminders(userId, householdId);
-  }, [userId, householdId]);
-
-  useRealtimeBills(householdId, {
-    onUpdate: () => void loadBills(),
-    onInsert: () => void loadBills(),
-  });
+  const { bills, loading, error, selectBill } = useBills();
+  const userBills = bills.map(formatBillDisplay);
 
   const labels: Record<string, string> = { All: t.bills.all, 'Due soon': t.bills.dueSoon, Upcoming: t.bills.upcoming, Paid: t.bills.paid, Overdue: t.bills.overdue };
   const displayBills = userBills;
@@ -90,7 +80,7 @@ export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen)
 
   const unpaidTotal = userBills.filter((b) => !['Paid', 'paid'].includes(b.status)).reduce((sum, b) => sum + b.rawAmount, 0);
   const unpaidCount = userBills.filter((b) => !['Paid', 'paid'].includes(b.status)).length;
-  const dueSoonCount = userBills.filter((b) => b.status.toLowerCase().includes('due')).length;
+  const dueSoonCount = userBills.filter((b) => b.status === 'Due soon').length;
   const overdueCount = userBills.filter((b) => b.status.toLowerCase().includes('overdue')).length;
 
   return (
@@ -108,7 +98,7 @@ export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen)
           title={t.bills.stillUnpaid}
           subtitle={unpaidCount > 0 ? `${unpaidCount} bill${unpaidCount > 1 ? 's' : ''} remaining` : 'No household bills yet'}
         >
-          <Text style={{ color: c.text, fontSize: 30, fontWeight: '800', letterSpacing: -0.8, marginTop: 4 }}>
+          <Text style={{ color: c.text, fontSize: 30, fontWeight: '600', letterSpacing: -0.8, marginTop: 4 }}>
             {unpaidTotal > 0 ? new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(unpaidTotal) : '₱0.00'}
           </Text>
           <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12, marginTop: 8 }}>
@@ -124,12 +114,12 @@ export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen)
             </Pressable>
           ))}
         </View>
-        {filtered.length ? filtered.map((b, i) => (
-          <PressRow key={b.id || i} onPress={() => go('bill-detail')} style={[styles.billCard, { backgroundColor: c.surface, borderColor: c.border }]}>
+        {loading ? <DataState c={c} loading title="Loading your bills" /> : error ? null : filtered.length ? filtered.map((b, i) => (
+          <PressRow key={b.id || i} onPress={() => { selectBill(b.id); go('bill-detail'); }} style={[styles.billCard, { backgroundColor: c.surface, borderColor: c.border }]}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 11 }}>
               <ProviderMark tone={b.tone} letter={b.provider[0]} />
               <View style={{ flex: 1 }}>
-                <Text style={{ color: c.text, fontWeight: '800', fontSize: 15 }}>{b.provider}</Text>
+                <Text style={{ color: c.text, fontWeight: '600', fontSize: 15 }}>{b.provider}</Text>
                 <Text style={{ color: c.textMuted, fontSize: 13, marginTop: 2 }}>{b.category} · •••• {b.account}</Text>
               </View>
               {b.paidBy && (
@@ -143,18 +133,18 @@ export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen)
             <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 12, paddingTop: 12, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: c.border }}>
               <View>
                 <Text style={{ color: c.textMuted, fontSize: 11 }}>{t.bills.due}</Text>
-                <Text style={{ color: c.text, fontWeight: '800' }}>{b.due}</Text>
+                <Text style={{ color: c.text, fontWeight: '600' }}>{b.due}</Text>
               </View>
               <View style={{ alignItems: 'flex-end', gap: 4 }}>
-                <Text style={{ color: c.text, fontSize: 16, fontWeight: '800' }}>{b.amount}</Text>
+                <Text style={{ color: c.text, fontSize: 16, fontWeight: '600' }}>{b.amount}</Text>
                 <StatusPill status={b.status} c={c} />
               </View>
             </View>
           </PressRow>
         )) : (
           <View style={{ alignItems: 'center', padding: 40 }}>
-            <Text style={{ color: c.text, fontSize: 20, fontWeight: '800' }}>No bills yet</Text>
-            <Text style={{ color: c.textMuted, marginVertical: 8, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>Add the first bill for this household to begin tracking it.</Text>
+            <Text style={{ color: c.text, fontSize: 20, fontWeight: '600' }}>{query || filter !== 'All' ? 'No matching bills' : 'Your first bill starts here'}</Text>
+            <Text style={{ color: c.textMuted, marginVertical: 8, fontSize: 14, lineHeight: 20, textAlign: 'center' }}>{query || filter !== 'All' ? 'Try another search or filter.' : 'Keep due dates, reminders, and payment records together.'}</Text>
             <PrimaryButton title={t.empty.add} onPress={() => go('add-bill')} c={c} icon={<Plus size={16} color="#fff" />} />
           </View>
         )}
@@ -165,140 +155,94 @@ export function BillsScreen({ go, t, c, userId, householdId }: { go: (s: Screen)
 }
 
 export function BillDetail({ go, t, c, setPayOpen, userId, householdId }: { go: (s: Screen) => void; t: Copy; c: Palette; setPayOpen: (v: boolean) => void; userId: string; householdId: string }) {
+  const { selected, loading, refresh } = useBills();
   const [archiving, setArchiving] = useState(false);
-  const [bill, setBill] = useState<BillDisplay | null>(null);
-
-  useEffect(() => {
-    if (!supabase || !householdId) return;
-    void supabase.from('bills').select('*').eq('household_id', householdId).order('due_date').limit(1).maybeSingle().then(({ data }) => {
-      if (data) setBill(formatBillDisplay(data as DbBill));
-    });
-  }, [householdId]);
-
-  const display = bill || formatBillDisplay({ provider: 'MERALCO', category: 'Electricity', account_number: '1234 5678 9012', amount: 2450.36, due_date: '2026-09-08', status: 'due_soon', billing_period: 'Aug 10 – Sep 10, 2026', paid_by: null, paid_at: null, payment_method: null, reference_number: null } as DbBill);
-
+  const [error, setError] = useState('');
+  const [copied, setCopied] = useState(false);
+  const bill = selected ? formatBillDisplay(selected) : null;
   const archive = async () => {
-    setArchiving(true);
-    if (supabase && bill) {
-      await supabase.from('bills').update({ status: 'archived' }).eq('id', bill.id).eq('household_id', householdId);
-    }
+    if (!supabase || !selected || archiving) return;
+    setArchiving(true); setError('');
+    const { error } = await supabase.from('bills').update({ status: 'archived' }).eq('id', selected.id).eq('household_id', householdId).select('id').single();
     setArchiving(false);
-    go('bills');
+    if (error) { setError(error.message); return; }
+    await refresh(); go('bills');
   };
-
-  useRealtimeBills(householdId, {
-    onUpdate: (updated) => {
-      if (updated && typeof updated === 'object') setBill(formatBillDisplay(updated as DbBill));
-    },
-  });
-
-  return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <AppHeader title={t.bills.details} onBack={() => go('bills')} c={c} trailing={
-        <Pressable onPress={() => go('edit-bill')} style={[styles.iconBtn, { backgroundColor: c.surface }]}><Pencil size={16} color={c.text} /></Pressable>
-      } />
-      <ScreenScroll>
-        <CinematicHero pose="bills" height={140} c={c} title={display.provider} subtitle="Review your household bill before payment." />
-        <View style={[styles.hero, { backgroundColor: c.surface }]}>
-          <ProviderMark tone={display.tone} letter={display.provider[0]} size={46} />
-          <View style={{ flex: 1 }}>
-            <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>{display.provider}</Text>
-            <Text style={{ color: c.textMuted, fontSize: 12 }}>{display.category} · {display.billingPeriod || 'Bahay'}</Text>
-          </View>
-          <StatusPill status={display.status} c={c} />
+  const toggleReminder = async (value: boolean) => {
+    if (!supabase || !selected) return;
+    const { error } = await supabase.from('bills').update({ reminder_days: value ? 5 : 0 }).eq('id', selected.id).eq('household_id', householdId).select('id').single();
+    if (error) setError(error.message); else await refresh();
+  };
+  if (!bill || !selected) return <View style={{ flex: 1, backgroundColor: c.bg }}><AppHeader title={t.bills.details} onBack={() => go('bills')} c={c} /><DataState c={c} loading={loading} title="Choose a household bill" body="Open a bill from your list to see its details." action={() => go('bills')} actionLabel="View bills" /></View>;
+  const display = bill;
+  return <View style={{ flex: 1, backgroundColor: c.bg }}>
+    <AppHeader title={t.bills.details} onBack={() => go('bills')} c={c} trailing={<Pressable accessibilityRole="button" accessibilityLabel="Edit bill options" onPress={() => go('edit-bill')} style={styles.iconBtn}><MoreHorizontal size={23} color={c.text} /></Pressable>} />
+    <ScreenScroll>
+      {error ? <InfoBanner c={c} tone="danger">{error}</InfoBanner> : null}
+      <Card c={c} style={{ gap: 22, marginBottom: 18, padding: 18 }}>
+        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 15 }}>
+          <View style={{ alignItems: 'center', width: 60 }}><ProviderMark tone={display.tone} letter={display.provider[0]} size={52} /><Text numberOfLines={1} style={{ color: c.text, fontSize: 8, marginTop: 3 }}>{display.provider.toUpperCase()}</Text></View>
+          <View style={{ flex: 1 }}><Text style={{ color: c.text, fontSize: 17, fontWeight: '600' }}>{display.provider.toUpperCase()}</Text><Text style={{ color: c.text, fontSize: 14, marginTop: 6 }}>{display.category}</Text></View>
+          <Pressable accessibilityRole="button" onPress={() => go('edit-bill')} style={{ backgroundColor: c.primarySoft, borderRadius: 12, paddingHorizontal: 12, paddingVertical: 9 }}><Text style={{ color: c.primary, fontSize: 12 }}>Change</Text></Pressable>
         </View>
-        <Card c={c} style={styles.rowBetween}>
-          <View>
-            <Text style={{ color: c.textMuted, fontSize: 11 }}>{t.bills.account}</Text>
-            <Text style={{ color: c.text, fontWeight: '800' }}>{display.account ? `•••• ${display.account}` : 'No account'}</Text>
-          </View>
-          <Pressable onPress={() => void Clipboard.setStringAsync(display.account)} style={[styles.copyBtn, { backgroundColor: c.primarySoft }]}>
-            <CopyIcon size={13} color={c.primary} /><Text style={{ color: c.primary, fontWeight: '700', fontSize: 12 }}>{t.bills.copy}</Text>
-          </Pressable>
-        </Card>
-        <Card c={c}>
-          <Row c={c} label={t.bills.amount} value={display.amount} large />
-          <Row c={c} label={t.bills.due} value={display.due} />
-          {display.billingPeriod && <Row c={c} label={t.bills.period} value={display.billingPeriod} />}
-          <View style={styles.rowBetween}><Text style={{ color: c.textMuted }}>{t.bills.status}</Text><StatusPill status={display.status} c={c} /></View>
-        </Card>
-        {display.paidBy && (
-          <Card c={c} style={{ marginBottom: 12 }}>
-            <View style={styles.rowBetween}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-              <View style={[styles.softIcon, { backgroundColor: c.successSoft }]}><Users size={17} color={c.success} /></View>
-              <View>
-                <Text style={{ color: c.text, fontWeight: '800' }}>{t.bills.paidBy || 'Paid by'}</Text>
-                <Text style={{ color: c.textMuted, fontSize: 12 }}>{display.paidBy}</Text>
-              </View>
-            </View>
-            {display.paidAt && (
-              <Text style={{ color: c.textMuted, fontSize: 11 }}>
-                {new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric' }).format(new Date(display.paidAt))}
-              </Text>
-            )}
-            </View>
-          </Card>
-        )}
-        {display.paymentMethod && (
-          <Card c={c} style={{ marginBottom: 12 }}>
-            <Row c={c} label={t.bills.method} value={display.paymentMethod} />
-            {display.referenceNumber && <Row c={c} label={t.bills.reference} value={display.referenceNumber} last />}
-          </Card>
-        )}
-        <Card c={c} style={styles.rowBetween}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
-            <View style={[styles.softIcon, { backgroundColor: c.primarySoft }]}><Bell size={17} color={c.primary} /></View>
-            <View>
-              <Text style={{ color: c.text, fontWeight: '800' }}>{t.bills.reminder}</Text>
-              <Text style={{ color: c.textMuted, fontSize: 12 }}>{t.bills.reminderHint}</Text>
-            </View>
-          </View>
-          <Switch value trackColor={{ true: c.primary }} />
-        </Card>
-        <View style={{ gap: 9, marginTop: 16 }}>
-          <PrimaryButton title={t.bills.payOutside} onPress={() => setPayOpen(true)} c={c} icon={<ArrowUpRight size={16} color="#fff" />} />
-          <SecondaryButton title={t.bills.markPaid} onPress={() => go('mark-paid')} c={c} icon={<Check size={16} color={c.text} />} />
-        </View>
-        <View style={{ flexDirection: 'row', gap: 7, marginTop: 14 }}>
-          <Info size={13} color={c.textMuted} />
-          <Text style={{ color: c.textMuted, fontSize: 12, flex: 1 }}>{t.bills.legal}</Text>
-        </View>
-        <View style={{ flexDirection: 'row', justifyContent: 'center', gap: 28, marginTop: 18 }}>
-          <Pressable onPress={() => go('edit-bill')}><Text style={{ color: c.textMuted }}>{t.bills.edit}</Text></Pressable>
-          <Pressable onPress={() => void archive()}><Text style={{ color: c.textMuted }}>{archiving ? t.bills.archiving : t.bills.archive}</Text></Pressable>
-        </View>
-      </ScreenScroll>
-    </View>
-  );
+        <View style={{ gap: 8 }}><Text style={{ color: c.textMuted, fontSize: 12 }}>{t.bills.account}</Text><View style={[styles.fake, { borderColor: c.border }]}><Text selectable style={{ flex: 1, color: c.text, fontSize: 15 }}>{selected.account_number || 'No account number'}</Text><Pressable accessibilityRole="button" accessibilityLabel="Copy account number" onPress={() => void Clipboard.setStringAsync(selected.account_number || '').then(() => setCopied(true)).catch(() => setError('Could not copy account details.'))} style={{ padding: 6 }}>{copied ? <Check size={16} color={c.success} /> : <CopyIcon size={16} color={c.textSoft} />}</Pressable></View></View>
+        <View style={{ gap: 8 }}><Text style={{ color: c.textMuted, fontSize: 12 }}>Alias (optional)</Text><View style={[styles.fake, { borderColor: c.border }]}><Text style={{ color: c.text, fontSize: 15 }}>{selected.alias || '—'}</Text></View></View>
+      </Card>
+      <Card c={c} style={{ marginBottom: 19, paddingHorizontal: 17, paddingVertical: 9 }}>
+        <Row c={c} label={t.bills.amount} value={display.amount} large />
+        <Row c={c} label={t.bills.due} value={display.due} />
+        <View style={{ alignItems: 'flex-end', marginBottom: 6 }}><StatusPill status={display.status} c={c} /></View>
+        <Row c={c} label={t.bills.period} value={display.billingPeriod || '—'} />
+        <Row c={c} label="Repeat" value={selected.recurrence.charAt(0).toUpperCase() + selected.recurrence.slice(1)} />
+        <View style={[styles.rowBetween, { paddingVertical: 13, gap: 10 }]}><Text style={{ color: c.textMuted, fontSize: 12 }}>Reminder</Text><Pressable accessibilityRole="switch" accessibilityState={{ checked: selected.reminder_days > 0 }} accessibilityLabel="Toggle bill reminder" onPress={() => void toggleReminder(selected.reminder_days === 0)}><Text style={{ color: c.text, fontSize: 14 }}>{selected.reminder_days > 0 ? selected.reminder_days + ' days before' : 'Off'}</Text></Pressable></View>
+      </Card>
+      {display.paidBy || display.paymentMethod ? <Card c={c} style={{ marginBottom: 16 }}>{display.paidBy && <Row c={c} label="Paid by" value={display.paidBy} />}{display.paymentMethod && <Row c={c} label={t.bills.method} value={display.paymentMethod} />}{display.referenceNumber && <Row c={c} label={t.bills.reference} value={display.referenceNumber} />}</Card> : null}
+      {selected.receipt_path ? <SecondaryButton title="View receipt" c={c} onPress={() => void receiptUrl(selected.receipt_path!).then(url => Linking.openURL(url)).catch(e => setError(e.message))} /> : null}
+      <Card c={c} onPress={() => { if (!['paid', 'archived'].includes(selected.status)) setPayOpen(true); }} style={{ flexDirection: 'row', alignItems: 'center', gap: 12, padding: 15, marginBottom: 16 }}>
+        <LinearGradient colors={[...gradient.button]} style={{ width: 29, height: 32, borderRadius: 7, alignItems: 'center', justifyContent: 'center' }}><ReceiptText size={22} color="#FFFFFF" /></LinearGradient>
+        <View style={{ flex: 1 }}><Text style={{ color: c.primary, fontSize: 14, fontWeight: '500' }}>{t.bills.payOutside}</Text><Text style={{ color: c.textMuted, fontSize: 10, marginTop: 5 }}>Bayarin does not process payments.</Text></View><ChevronRight size={20} color={c.text} />
+      </Card>
+      <PrimaryButton disabled={['paid', 'archived'].includes(selected.status)} title={selected.status === 'paid' ? 'Recorded as paid' : selected.status === 'archived' ? 'Archived' : t.bills.markPaid} onPress={() => go('mark-paid')} c={c} />
+      <View style={{ flexDirection: 'row', gap: 12, marginTop: 18 }}><View style={{ flex: 1 }}><SecondaryButton title={t.bills.edit} onPress={() => go('edit-bill')} c={c} icon={<Pencil size={17} color={c.textMuted} />} /></View><View style={{ flex: 1 }}><SecondaryButton title={archiving ? t.bills.archiving : t.bills.archive} onPress={() => void archive()} c={c} icon={<Archive size={17} color={c.textMuted} />} /></View></View>
+    </ScreenScroll>
+  </View>;
 }
 
 export function BillForm({ go, t, c, userId, householdId, service, provider, edit = false }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string; service: BillService; provider: ServiceProvider; edit?: boolean }) {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
-  const [account, setAccount] = useState('');
-  const [alias, setAlias] = useState('');
-  const [amount, setAmount] = useState('');
-  const [due, setDue] = useState('');
-  const [period, setPeriod] = useState('');
+  const { selected, refresh } = useBills();
+  const initialService = edit && selected ? Object.values(billServices).find(item => item.name === selected.category) || { ...billServices.other, name: selected.category } : service;
+  const initialProvider = edit && selected ? initialService.providers.find(item => item.name.toLowerCase() === selected.provider.toLowerCase()) || { id: 'existing', name: selected.provider, mark: selected.provider.charAt(0), tone: formatBillDisplay(selected).tone, detail: selected.category } : provider;
+  const [chosenService, setChosenService] = useState(initialService);
+  const [chosenProvider, setChosenProvider] = useState(initialProvider);
+  const [providerPicker, setProviderPicker] = useState(!edit);
+  const [customProvider, setCustomProvider] = useState('');
+  const custom = chosenProvider.name.startsWith('Other');
+  const [recurrence, setRecurrence] = useState(edit ? selected?.recurrence || 'monthly' : 'monthly');
+  const [reminderDays, setReminderDays] = useState(edit ? selected?.reminder_days ?? 5 : 5);
+  const [account, setAccount] = useState(edit ? selected?.account_number || '' : '');
+  const [alias, setAlias] = useState(edit ? String(selected?.alias ?? '') : '');
+  const [amount, setAmount] = useState(edit ? String(selected?.amount ?? '') : '');
+  const [due, setDue] = useState(edit ? String(selected?.due_date ?? '') : '');
+  const [period, setPeriod] = useState(edit ? String(selected?.billing_period ?? '') : '');
   const save = async () => {
+    if (saving) return;
     setError('');
     if (!supabase) { setError(supabaseSetupMessage); return; }
+    if (!householdId || (edit && !selected)) { setError('Select a household bill first.'); return; }
+    if (!account.trim() || !validAmount(amount) || !validDate(due)) { setError('Enter an account number, a positive amount with up to two decimals, and a real date (YYYY-MM-DD).'); return; }
+    if (custom && !customProvider.trim()) { setError('Enter your provider’s name.'); return; }
     setSaving(true);
-    if (!householdId) { setError('Join a household before adding a bill.'); setSaving(false); return; }
-    if (!account.trim() || !amount.trim() || Number(amount) <= 0 || !/^\d{4}-\d{2}-\d{2}$/.test(due)) { setError('Enter your account number, a valid amount, and a due date (YYYY-MM-DD).'); setSaving(false); return; }
-    const payload = { user_id: userId, household_id: householdId, provider: provider.name, category: service.name, account_number: account.trim(), alias: alias.trim() || null, amount: Number(amount), due_date: due, billing_period: period.trim() || null, recurrence: 'monthly', reminder_days: 5, status: 'upcoming' };
-    let authError;
-    if (edit) {
-      const { data: existing } = await supabase.from('bills').select('id').eq('household_id', householdId).eq('provider', provider.name).limit(1).maybeSingle();
-      if (existing) ({ error: authError } = await supabase.from('bills').update(payload).eq('id', existing.id).eq('household_id', householdId));
-      else ({ error: authError } = await supabase.from('bills').insert(payload));
-    } else ({ error: authError } = await supabase.from('bills').insert(payload));
-    setSaving(false);
-    if (authError) { setError(authError.message); return; }
-    await createBillActivityEvent(userId, householdId, null, edit ? 'bill_updated' : 'bill_added', `${provider.name} bill ${edit ? 'updated' : 'added'}`, payload.amount);
-    await createNotification(userId, edit ? 'Bill updated' : 'Bill added', `${provider.name} bill ${edit ? 'updated' : 'added'} — ${new Intl.NumberFormat('en-PH', { style: 'currency', currency: 'PHP' }).format(payload.amount)}`, 'bill_update', undefined, { status: edit ? 'updated' : 'added' });
-    go('bills');
+    try {
+      const payload = { provider: custom ? customProvider.trim() : chosenProvider.name, category: chosenService.name, account_number: account.trim(), alias: alias.trim() || null, amount: Number(amount), due_date: due, billing_period: period.trim() || null, recurrence, reminder_days: reminderDays };
+      const result = edit
+        ? await supabase.from('bills').update(payload).eq('id', selected!.id).eq('household_id', householdId).select('id').single()
+        : await supabase.from('bills').insert({ ...payload, user_id: userId, household_id: householdId, status: 'upcoming' }).select('id').single();
+      if (result.error) throw new Error(result.error.message);
+      await refresh(); go('bills');
+    } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not save this bill.'); }
+    finally { setSaving(false); }
   };
   return (
     <View style={{ flex: 1, backgroundColor: c.bg }}>
@@ -308,11 +252,13 @@ export function BillForm({ go, t, c, userId, householdId, service, provider, edi
         <Card c={c} style={{ gap: 12 }}>
           {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
           <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '700' }}>{t.bills.provider}</Text>
-          <View style={[styles.fake, { borderColor: c.border, backgroundColor: c.bg }]}>
-            <ProviderMark tone={provider.tone} letter={provider.mark} size={28} />
-            <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '800' }}>{provider.name}</Text><Text style={{ color: c.textMuted, fontSize: 11 }}>{service.name}</Text></View>
+          <Pressable accessibilityRole="button" accessibilityLabel="Change bill provider" onPress={() => setProviderPicker(value => !value)} style={[styles.fake, { borderColor: c.border, backgroundColor: c.bg }]}>
+            <ProviderMark tone={chosenProvider.tone} letter={chosenProvider.mark} size={28} />
+            <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '600' }}>{chosenProvider.name}</Text><Text style={{ color: c.textMuted, fontSize: 11 }}>{chosenService.name}</Text></View>
             <ChevronRight size={14} color={c.textMuted} />
-          </View>
+          </Pressable>
+          {providerPicker && <><Text style={{ color: c.textMuted }}>Category</Text><View style={styles.filters}>{Object.values(billServices).map(item => <Pressable accessibilityRole="button" key={item.id} onPress={() => { setChosenService(item); setChosenProvider(item.providers[0]); }} style={[styles.chip, { backgroundColor: chosenService.id === item.id ? c.primarySoft : c.bg, borderColor: c.border }]}><Text style={{ color: c.text }}>{item.name}</Text></Pressable>)}</View><View style={styles.filters}>{chosenService.providers.map(item => <Pressable accessibilityRole="button" key={item.id} onPress={() => { setChosenProvider(item); setProviderPicker(false); }} style={[styles.chip, { backgroundColor: chosenProvider.id === item.id ? c.primarySoft : c.bg, borderColor: c.border }]}><Text style={{ color: c.text }}>{item.name}</Text></Pressable>)}</View></>}
+          {custom && <Labeled c={c} label="Provider name" value={customProvider} onChange={setCustomProvider} />}
           <Labeled c={c} label={t.bills.account} value={account} onChange={setAccount} />
           <Labeled c={c} label={`${t.bills.alias} ${t.bills.optional}`} value={alias} onChange={setAlias} />
           <View style={{ flexDirection: 'row', gap: 10 }}>
@@ -320,7 +266,9 @@ export function BillForm({ go, t, c, userId, householdId, service, provider, edi
             <View style={{ flex: 1 }}><Labeled c={c} label={t.bills.due} value={due} onChange={setDue} /></View>
           </View>
           <Labeled c={c} label={`${t.bills.period} ${t.bills.optional}`} value={period} onChange={setPeriod} />
-          <PrimaryButton title={saving ? t.bills.saving : edit ? t.bills.saveChanges : t.bills.save} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
+          <Text style={{ color: c.textMuted }}>Repeats</Text><View style={styles.filters}>{['once', 'weekly', 'monthly', 'yearly'].map(value => <Pressable key={value} onPress={() => setRecurrence(value)} style={[styles.chip, { backgroundColor: recurrence === value ? c.primarySoft : c.bg, borderColor: c.border }]}><Text style={{ color: c.text }}>{value}</Text></Pressable>)}</View>
+          <Text style={{ color: c.textMuted }}>Remind me before the due date</Text><View style={styles.filters}>{[0, 1, 3, 5, 7].map(value => <Pressable key={value} onPress={() => setReminderDays(value)} style={[styles.chip, { backgroundColor: reminderDays === value ? c.primarySoft : c.bg, borderColor: c.border }]}><Text style={{ color: c.text }}>{value ? value + (value === 1 ? ' day' : ' days') : 'Off'}</Text></Pressable>)}</View>
+          <PrimaryButton disabled={edit && !selected} title={saving ? t.bills.saving : edit ? t.bills.saveChanges : t.bills.save} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
         </Card>
       </ScreenScroll>
     </View>
@@ -328,44 +276,45 @@ export function BillForm({ go, t, c, userId, householdId, service, provider, edi
 }
 
 export function MarkPaid({ go, t, c, userId, householdId }: { go: (s: Screen) => void; t: Copy; c: Palette; userId: string; householdId: string }) {
+  const savingRef = useRef(false);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState('');
   const [method, setMethod] = useState('GCash');
   const [reference, setReference] = useState('');
+  const [receipt, setReceipt] = useState<Receipt | null>(null);
   const [selectedMember, setSelectedMember] = useState('');
   const [members, setMembers] = useState<HouseholdUser[]>([]);
-  const [billId, setBillId] = useState('');
+  const { selected, refresh } = useBills();
+  const billId = selected?.id;
+  const display = selected ? formatBillDisplay(selected) : null;
 
   useEffect(() => {
     if (!supabase || !householdId) return;
-    void fetchHouseholdUsers(householdId).then(setMembers);
-    void supabase.from('bills').select('id,provider,amount').eq('household_id', householdId).neq('status', 'paid').order('due_date').limit(1).maybeSingle().then(({ data }) => {
-      if (data) setBillId(data.id);
-    });
+    void fetchHouseholdUsers(householdId).then(setMembers).catch(e => setError(e.message));
+
   }, [householdId]);
 
   const save = async () => {
+    if (savingRef.current) return;
     setError('');
     if (!supabase) { setError(supabaseSetupMessage); return; }
-    if (!billId) { setError('No unpaid bill found. Add a bill first.'); return; }
+    if (!billId || !householdId || !selected || ['paid', 'archived'].includes(selected.status)) { setError('Choose an unpaid bill to record a payment.'); return; }
+    savingRef.current = true;
     setSaving(true);
+    let uploaded: string | undefined;
     try {
-      const paidBy = selectedMember || 'You';
-      await markBillPaid(billId, householdId, method, reference, paidBy);
-      await createBillActivityEvent(userId, householdId, billId, 'bill_marked_paid', `Meralco marked paid by ${paidBy}`, 2450.36, { paid_by: paidBy, payment_method: method });
-      await createNotification(
-        userId,
-        'Bill marked as paid',
-        `Meralco bill marked as paid by ${paidBy} via ${method}`,
-        'payment_update',
-        billId,
-        { actor: paidBy, payment_method: method, reference_number: reference, status: 'paid' },
-      );
+      const paidBy = selectedMember || members.find(m => m.user_id === userId)?.profile?.full_name || 'Household member';
+      if (receipt) uploaded = await uploadReceipt(receipt, householdId, billId);
+      await markBillPaid(billId, householdId, method, reference, paidBy, uploaded);
+      await refresh();
       setSaving(false);
       go('success');
     } catch (err) {
+      if (uploaded) await supabase.storage.from('receipts').remove([uploaded]);
       setSaving(false);
       setError(err instanceof Error ? err.message : 'Failed to record payment');
+    } finally {
+      savingRef.current = false;
     }
   };
 
@@ -375,9 +324,9 @@ export function MarkPaid({ go, t, c, userId, householdId }: { go: (s: Screen) =>
       <ScreenScroll>
         <CinematicHero pose="bills" height={140} c={c} title={t.bills.markTitle} subtitle="Keep your shared household record up to date." />
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 10 }}>
-          <ProviderMark tone="orange" letter="M" />
-          <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '800' }}>MERALCO</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{t.bills.amount}</Text></View>
-          <Text style={{ color: c.text, fontSize: 18, fontWeight: '800' }}>₱2,450.36</Text>
+          <ProviderMark tone={display?.tone || 'indigo'} letter={display?.provider.charAt(0) || 'B'} />
+          <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '600' }}>{display?.provider || 'Select a bill'}</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>{t.bills.amount}</Text></View>
+          <Text style={{ color: c.text, fontSize: 18, fontWeight: '600' }}>{display?.amount || '—'}</Text>
         </View>
         <Card c={c} style={{ gap: 12 }}>
           {error ? <Text style={{ color: c.danger }}>{error}</Text> : null}
@@ -397,8 +346,8 @@ export function MarkPaid({ go, t, c, userId, householdId }: { go: (s: Screen) =>
               </View>
             </>
           )}
-          <Labeled c={c} label={t.bills.amount} value="₱ 2,450.36" editable={false} />
-          <Labeled c={c} label={t.bills.datePaid} value={new Date().toISOString().split('T')[0]} editable={false} />
+          <Labeled c={c} label={t.bills.amount} value={display?.amount || '—'} editable={false} />
+          <Labeled c={c} label={t.bills.datePaid} value={localDateKey()} editable={false} />
           <Text style={{ color: c.textMuted, fontSize: 12, fontWeight: '700' }}>{t.bills.method}</Text>
           <View style={{ flexDirection: 'row', gap: 8 }}>
             {['GCash', 'Maya', 'Bank', 'Cash'].map((m) => (
@@ -408,12 +357,9 @@ export function MarkPaid({ go, t, c, userId, householdId }: { go: (s: Screen) =>
             ))}
           </View>
           <Labeled c={c} label={`${t.bills.reference} ${t.bills.optional}`} value={reference} onChange={setReference} />
-          <View style={[styles.upload, { borderColor: c.border, backgroundColor: c.bg }]}>
-            <Upload size={17} color={c.primary} />
-            <Text style={{ color: c.primary, fontWeight: '800' }}>{t.bills.attach}</Text>
-            <Text style={{ color: c.textMuted, fontSize: 11 }}>{t.bills.attachHint}</Text>
-          </View>
-          <PrimaryButton title={saving ? t.bills.recording : t.bills.confirmPaid} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
+          <SecondaryButton c={c} title={receipt ? `Receipt: ${receipt.name}` : 'Attach receipt (optional)'} icon={<Upload size={17} color={c.primary} />} onPress={() => void chooseReceipt().then(file => { if (file) setReceipt(file); }).catch(e => setError(e.message))} />
+          {receipt ? <Pressable accessibilityRole="button" onPress={() => setReceipt(null)}><Text style={{ color: c.danger }}>Remove attachment</Text></Pressable> : <Text style={{ color: c.textMuted, fontSize: 12 }}>JPG, PNG, or PDF · up to 10 MB · shared only with your household</Text>}
+          <PrimaryButton disabled={!selected || selected.status === 'paid'} title={saving ? t.bills.recording : t.bills.confirmPaid} loading={saving} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
         </Card>
         <View style={{ flexDirection: 'row', gap: 7, marginTop: 14 }}>
           <Info size={13} color={c.textMuted} />
@@ -425,32 +371,15 @@ export function MarkPaid({ go, t, c, userId, householdId }: { go: (s: Screen) =>
 }
 
 export function SuccessScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
-  return (
-    <View style={{ flex: 1, backgroundColor: c.bg }}>
-      <ScreenScroll>
-        <View style={{ alignItems: 'center', paddingTop: 20 }}>
-          <LinearGradient colors={[...gradient.hero]} style={styles.successVisual}>
-            <Image source={images.onboarding} style={{ width: '100%', height: '100%' }} />
-            <View style={styles.successCheck}><Check size={22} color="#fff" /></View>
-          </LinearGradient>
-          <Text style={{ color: c.primary, fontSize: 11, letterSpacing: 1.3, fontWeight: '800', marginTop: 16 }}>{t.bills.successKicker}</Text>
-          <Text style={{ color: c.text, fontSize: 28, fontWeight: '800', marginTop: 8 }}>{t.bills.recorded}</Text>
-          <Text style={{ color: c.textMuted }}>{t.bills.recordedBody}</Text>
-        </View>
-        <Card c={c} style={{ marginTop: 24 }}>
-          <Text style={{ color: c.textMuted, fontSize: 11 }}>{t.bills.amountPaid}</Text>
-          <Text style={{ color: c.text, fontSize: 32, fontWeight: '800', marginBottom: 12 }}>₱2,450.36</Text>
-          <Row c={c} label={t.bills.paidTo} value="MERALCO" />
-          <Row c={c} label={t.bills.datePaid} value={new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric' }).format(new Date())} />
-          <Row c={c} label={t.bills.method} value="GCash" last />
-        </Card>
-        <View style={{ gap: 9, marginTop: 22 }}>
-          <SecondaryButton title={t.bills.viewBill} onPress={() => go('bill-detail')} c={c} />
-          <PrimaryButton title={t.bills.backHome} onPress={() => go('home')} c={c} icon={<Home size={16} color="#fff" />} />
-        </View>
-      </ScreenScroll>
-    </View>
-  );
+  const { selected } = useBills();
+  const display = selected ? formatBillDisplay(selected) : null;
+  const paidDate = selected?.paid_at ? new Date(selected.paid_at) : null;
+  const details = [['Amount', display?.amount || '—'], ['Provider', display?.provider.toUpperCase() || '—'], ['Date paid', paidDate ? new Intl.DateTimeFormat('en-PH', { month: 'short', day: 'numeric', year: 'numeric', hour: 'numeric', minute: '2-digit' }).format(paidDate) : '—'], ['Payment method', selected?.payment_method || '—'], ['Reference No.', selected?.reference_number || '—']];
+  return <View style={{ flex: 1, backgroundColor: c.bg }}><ScreenScroll>
+    <View style={{ alignItems: 'center', paddingTop: 20 }}><SuccessArt size={165} /><Text style={{ color: c.text, fontSize: 24, fontWeight: '600', marginTop: 8 }}>{t.bills.recorded}</Text><Text style={{ color: c.textMuted, textAlign: 'center', maxWidth: 265, fontSize: 13, lineHeight: 20, marginTop: 8 }}>{t.bills.recordedBody}</Text></View>
+    <Card c={c} style={{ marginTop: 22, gap: 13 }}>{details.map(([label, value], i) => <View key={label}><Text style={{ color: c.textMuted, fontSize: 11, marginBottom: 5 }}>{label}</Text><Text selectable style={{ color: c.text, fontSize: i === 0 ? 24 : 14, fontWeight: i === 0 ? '600' : '500' }}>{value}</Text></View>)}</Card>
+    <View style={{ gap: 10, marginTop: 15 }}><SecondaryButton title={t.bills.viewBill} onPress={() => go('bill-detail')} c={c} /><PrimaryButton title={t.bills.backHome} onPress={() => go('home')} c={c} /></View>
+  </ScreenScroll></View>;
 }
 
 export function PaySheets({
@@ -460,40 +389,47 @@ export function PaySheets({
   go: (s: Screen) => void; t: Copy; c: Palette;
 }) {
   const [copied, setCopied] = useState(false);
-  const choose = () => { setPayOpen(false); setReturnOpen(true); };
+  const { selected } = useBills();
+  const display = selected ? formatBillDisplay(selected) : null;
+  const [error, setError] = useState('');
+  const choose = async (method: string) => {
+    if (!selected) return;
+    setError('');
+    try { await openPaymentDestination(method, selected.provider); setPayOpen(false); setReturnOpen(true); }
+    catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not open this payment destination.'); }
+  };
   const copy = async () => {
-    await Clipboard.setStringAsync('MERALCO · Account 1234 5678 9012 · ₱2,450.36 · Due Sep 8, 2026');
+    if (!selected || !display) return;
+    await Clipboard.setStringAsync(`${selected.provider} · Account ${selected.account_number || '—'} · ${display.amount} · Due ${display.due}`);
     setCopied(true);
     setTimeout(() => setCopied(false), 1600);
   };
   return (
     <>
       <Sheet visible={payOpen} onClose={() => setPayOpen(false)} c={c} title={t.pay.title} body={t.pay.body}>
-        <View style={[styles.sheetBill, { backgroundColor: c.bg }]}>
-          <ProviderMark tone="orange" letter="M" />
-          <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '800' }}>MERALCO</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>Account •••• 9012</Text></View>
-          <Text style={{ color: c.text, fontWeight: '800' }}>₱2,450.36</Text>
-        </View>
+        <Card c={c} style={{ marginBottom: 15, padding: 15 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}><ProviderMark tone={display?.tone || 'indigo'} letter={display?.provider.charAt(0) || 'B'} size={38} /><View><Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }}>{display?.provider || 'Select a bill'}</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 3 }}>{display?.category || 'Household bill'}</Text></View></View>
+          <View style={{ gap: 13 }}><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Account</Text><Text style={{ color: c.text, fontSize: 12 }}>•••• {display?.account || '—'}</Text></View><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Amount</Text><Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>{display?.amount || '—'}</Text></View><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Due Date</Text><Text style={{ color: c.text, fontSize: 12 }}>{display?.due || '—'}</Text></View></View>
+        </Card>
         {[
-          { label: t.pay.gcash, color: '#1776E8', mark: 'G', action: choose },
-          { label: t.pay.maya, color: '#101513', mark: 'M', action: choose },
-          { label: t.pay.web, color: '#5C5852', mark: 'W', action: choose },
-          { label: copied ? t.pay.copied : t.pay.copy, color: '#264BD6', mark: 'C', action: () => void copy() },
+          { label: t.pay.gcash, color: '#1776E8', mark: 'G', action: () => void choose('GCash') },
+          { label: t.pay.maya, color: '#101513', mark: 'M', action: () => void choose('Maya') },
+          { label: t.pay.web, color: '#5C5852', mark: 'W', action: () => void choose('Provider') },
+          { label: copied ? t.pay.copied : t.pay.copy, color: '#264BD6', mark: 'C', action: () => void copy().catch(() => setError('Could not copy payment details.')) },
         ].map((row) => (
-          <Pressable key={row.label} onPress={row.action} style={[styles.extRow, { borderBottomColor: c.border }]}>
-            <View style={[styles.extIcon, { backgroundColor: row.color }]}><Text style={{ color: '#fff', fontWeight: '900' }}>{row.mark}</Text></View>
-            <Text style={{ flex: 1, color: c.text, fontWeight: '800' }}>{row.label}</Text>
-            <ArrowUpRight size={14} color={c.textMuted} />
+          <Pressable key={row.label} accessibilityRole="button" accessibilityLabel={row.label} onPress={row.action} style={[styles.extRow, { backgroundColor: c.surface, borderColor: c.border }]}>
+            <View style={[styles.extIcon, { backgroundColor: ['W', 'C'].includes(row.mark) ? 'transparent' : row.color }]}>{row.mark === 'W' ? <Globe size={25} color={c.textMuted} /> : row.mark === 'C' ? <CopyIcon size={24} color={c.textMuted} /> : <Text style={{ color: row.mark === 'M' ? '#53EE8B' : '#FFFFFF', fontSize: 22, fontWeight: '700' }}>{row.mark === 'M' ? 'm' : 'G'}</Text>}</View>
+            <Text style={{ flex: 1, color: c.text, fontWeight: '600' }}>{row.label}</Text>
+            <ChevronRight size={18} color={c.textMuted} />
           </Pressable>
         ))}
-        <Text style={{ textAlign: 'center', color: c.textMuted, fontSize: 12, marginTop: 12 }}>{t.pay.footer}</Text>
+        {error ? <InfoBanner c={c} tone="danger">{error}</InfoBanner> : null}<View style={{ marginTop: 16 }}><InfoBanner c={c} icon={<Info size={18} color={c.primary} />}>{t.pay.footer}</InfoBanner></View>
       </Sheet>
-      <Sheet visible={returnOpen} onClose={() => setReturnOpen(false)} c={c} title={t.pay.finished} body={t.pay.finishedBody}>
-        <View style={[styles.sheetBill, { backgroundColor: c.bg }]}>
-          <ProviderMark tone="orange" letter="M" />
-          <View style={{ flex: 1 }}><Text style={{ color: c.text, fontWeight: '800' }}>MERALCO</Text><Text style={{ color: c.textMuted, fontSize: 12 }}>Account •••• 9012</Text></View>
-          <Text style={{ color: c.text, fontWeight: '800' }}>₱2,450.36</Text>
-        </View>
+      <Sheet companion visible={returnOpen} onClose={() => setReturnOpen(false)} c={c} title={t.pay.finished} body={t.pay.finishedBody}>
+        <Card c={c} style={{ marginBottom: 15, padding: 15 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 12 }}><ProviderMark tone={display?.tone || 'indigo'} letter={display?.provider.charAt(0) || 'B'} size={38} /><View><Text style={{ color: c.text, fontWeight: '600', fontSize: 14 }}>{display?.provider || 'Select a bill'}</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 3 }}>{display?.category || 'Household bill'}</Text></View></View>
+          <View style={{ gap: 13 }}><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Account</Text><Text style={{ color: c.text, fontSize: 12 }}>•••• {display?.account || '—'}</Text></View><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Amount</Text><Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>{display?.amount || '—'}</Text></View><View style={styles.rowBetween}><Text style={{ color: c.textMuted, fontSize: 12 }}>Due Date</Text><Text style={{ color: c.text, fontSize: 12 }}>{display?.due || '—'}</Text></View></View>
+        </Card>
         <PrimaryButton title={t.pay.yes} onPress={() => { setReturnOpen(false); go('mark-paid'); }} c={c} icon={<Check size={16} color="#fff" />} />
         <View style={{ height: 8 }} />
         <SecondaryButton title={t.pay.notYet} onPress={() => setReturnOpen(false)} c={c} />
@@ -502,26 +438,29 @@ export function PaySheets({
   );
 }
 
-function Sheet({ visible, onClose, c, title, body, children }: { visible: boolean; onClose: () => void; c: Palette; title: string; body: string; children: ReactNode }) {
-  return (
-    <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
-      <Pressable style={styles.overlay} onPress={onClose} />
-      <View style={[styles.sheet, { backgroundColor: c.surface }]}>
-        <View style={[styles.handle, { backgroundColor: c.border }]} />
-        <Pressable onPress={onClose} style={styles.sheetClose}><X size={18} color={c.textMuted} /></Pressable>
-        <Text style={{ color: c.text, fontSize: 22, fontWeight: '800', letterSpacing: -0.4 }}>{title}</Text>
-        <Text style={{ color: c.textMuted, fontSize: 13, marginTop: 6, marginBottom: 12 }}>{body}</Text>
-        {children}
+function Sheet({ visible, onClose, c, title, body, children, companion = false }: { visible: boolean; onClose: () => void; c: Palette; title: string; body: string; children: ReactNode; companion?: boolean }) {
+  const insets = useSafeAreaInsets();
+  return <Modal visible={visible} transparent animationType="slide" onRequestClose={onClose}>
+    <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', paddingTop: insets.top, paddingBottom: insets.bottom, backgroundColor: c.overlay }}>
+      <Pressable accessibilityLabel="Dismiss payment sheet" style={StyleSheet.absoluteFill} onPress={onClose} />
+      <View style={{ width: '100%', maxWidth: 420, maxHeight: '96%', borderRadius: 28, backgroundColor: c.bg, overflow: 'hidden' }}>
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ padding: 20, paddingTop: 30, paddingBottom: 28 }}>
+          <Pressable accessibilityRole="button" accessibilityLabel="Close payment options" onPress={onClose} style={{ position: 'absolute', right: 12, top: 14, width: 36, height: 36, alignItems: 'center', justifyContent: 'center', zIndex: 2 }}><X size={21} color={c.text} /></Pressable>
+          {companion && <Image source={images.avatar} resizeMode="contain" style={{ height: 180, width: 200, alignSelf: 'center', marginBottom: 12 }} />}
+          <Text style={{ color: c.text, fontSize: companion ? 22 : 18, fontWeight: '600', letterSpacing: -.4, textAlign: companion ? 'center' : 'left', paddingRight: companion ? 0 : 24 }}>{title}</Text>
+          <Text style={{ color: c.textMuted, fontSize: 12, lineHeight: 18, marginTop: 10, marginBottom: 20, textAlign: companion ? 'center' : 'left' }}>{body}</Text>
+          {children}
+        </ScrollView>
       </View>
-    </Modal>
-  );
+    </View>
+  </Modal>;
 }
 
 function Row({ c, label, value, large, last }: { c: Palette; label: string; value: string; large?: boolean; last?: boolean }) {
   return (
-    <View style={[styles.rowBetween, !last && { borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: c.border, paddingVertical: 12 }]}>
-      <Text style={{ color: c.textMuted }}>{label}</Text>
-      <Text style={{ color: c.text, fontWeight: '800', fontSize: large ? 17 : 14 }}>{value}</Text>
+    <View style={[styles.rowBetween, { paddingVertical: 14, gap: 16 }]}>
+      <Text style={{ color: c.textMuted, fontSize: 12 }}>{label}</Text>
+      <Text style={{ color: c.text, fontWeight: large ? '600' : '400', textAlign: 'right', flexShrink: 1, fontSize: large ? 19 : 14 }}>{value}</Text>
     </View>
   );
 }
@@ -557,11 +496,11 @@ const styles = StyleSheet.create({
   successVisual: { width: 190, height: 150, borderRadius: 38, overflow: 'hidden' },
   successCheck: { position: 'absolute', right: 12, bottom: 12, width: 54, height: 54, borderRadius: 27, backgroundColor: '#16804E', alignItems: 'center', justifyContent: 'center', borderWidth: 5, borderColor: 'rgba(255,255,255,0.82)' },
   overlay: { flex: 1, backgroundColor: 'rgba(10,14,40,0.48)' },
-  sheet: { position: 'absolute', left: 0, right: 0, bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
+  sheet: { position: 'absolute', alignSelf: 'center', width: '100%', maxWidth: 560, maxHeight: '90%', bottom: 0, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: 20, paddingBottom: 32 },
   handle: { width: 42, height: 4, borderRadius: 5, alignSelf: 'center', marginBottom: 16 },
   sheetClose: { position: 'absolute', right: 18, top: 18 },
   sheetBill: { flexDirection: 'row', alignItems: 'center', gap: 10, padding: 14, borderRadius: 15, marginBottom: 8 },
-  extRow: { height: 52, flexDirection: 'row', alignItems: 'center', gap: 10, borderBottomWidth: StyleSheet.hairlineWidth },
+  extRow: { minHeight: 52, flexDirection: 'row', alignItems: 'center', gap: 12, borderWidth: 1, paddingHorizontal: 12, borderRadius: 14, marginBottom: 5 },
   extIcon: { width: 32, height: 32, borderRadius: 10, alignItems: 'center', justifyContent: 'center' },
   paidByChip: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 999 },
 });

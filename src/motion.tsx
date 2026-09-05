@@ -4,6 +4,8 @@ import { useEffect } from 'react';
 import { Image, Pressable, StyleSheet, type ImageSourcePropType, type StyleProp, type ViewStyle } from 'react-native';
 import Animated, {
   Easing,
+  cancelAnimation,
+  useReducedMotion,
   FadeInDown,
   FadeInUp,
   interpolate,
@@ -34,13 +36,15 @@ export function ScreenTransition({ id, children }: { id: string; children: React
 export function Float3D({
   children, delay = 0, intensity = 1, style,
 }: { children: ReactNode; delay?: number; intensity?: number; style?: StyleProp<ViewStyle> }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     const timeout = setTimeout(() => {
       t.value = withRepeat(withTiming(1, { duration: 4200, easing: ease }), -1, true);
     }, delay);
-    return () => clearTimeout(timeout);
-  }, [delay, t]);
+    return () => { clearTimeout(timeout); cancelAnimation(t); };
+  }, [delay, t, reduced]);
   const anim = useAnimatedStyle(() => ({
     transform: [
       { perspective: 900 },
@@ -54,10 +58,13 @@ export function Float3D({
 }
 
 export function Pulse3D({ children }: { children: ReactNode }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     t.value = withRepeat(withTiming(1, { duration: 2200, easing: ease }), -1, true);
-  }, [t]);
+    return () => cancelAnimation(t);
+  }, [t, reduced]);
   const anim = useAnimatedStyle(() => ({
     transform: [{ scale: interpolate(t.value, [0, 1], [1, 1.08]) }],
     opacity: interpolate(t.value, [0, 1], [0.55, 1]),
@@ -68,13 +75,15 @@ export function Pulse3D({ children }: { children: ReactNode }) {
 export function OrbitOrb({ size, color, radiusX, radiusY, duration, delay = 0 }: {
   size: number; color: string; radiusX: number; radiusY: number; duration: number; delay?: number;
 }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     const timeout = setTimeout(() => {
       t.value = withRepeat(withTiming(1, { duration, easing: Easing.linear }), -1, false);
     }, delay);
-    return () => clearTimeout(timeout);
-  }, [delay, duration, t]);
+    return () => { clearTimeout(timeout); cancelAnimation(t); };
+  }, [delay, duration, t, reduced]);
   const anim = useAnimatedStyle(() => {
     const a = t.value * Math.PI * 2;
     return {
@@ -97,6 +106,8 @@ export function PressScale({ children, onPress, disabled, style }: {
   const anim = useAnimatedStyle(() => ({ transform: [{ scale: s.value }] }));
   return (
     <Pressable
+      accessibilityRole="button"
+      accessibilityState={{ disabled: !!disabled }}
       disabled={disabled}
       onPress={onPress}
       onPressIn={() => { s.value = withSpring(0.96, { damping: 15, stiffness: 400 }); }}
@@ -108,10 +119,13 @@ export function PressScale({ children, onPress, disabled, style }: {
 }
 
 export function TiltCard({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     t.value = withRepeat(withTiming(1, { duration: 5600, easing: ease }), -1, true);
-  }, [t]);
+    return () => cancelAnimation(t);
+  }, [t, reduced]);
   const anim = useAnimatedStyle(() => ({
     transform: [
       { perspective: 1000 },
@@ -187,10 +201,13 @@ export function FadeScale({ children, delay = 0, style }: {
 export function GlowPulse({ children, color = 'rgba(47,70,232,0.35)', size = 8, style }: {
   children: ReactNode; color?: string; size?: number; style?: ViewStyle;
 }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     t.value = withRepeat(withTiming(1, { duration: 2400, easing: ease }), -1, true);
-  }, [t]);
+    return () => cancelAnimation(t);
+  }, [t, reduced]);
   const anim = useAnimatedStyle(() => ({
     shadowOpacity: interpolate(t.value, [0, 1], [0.15, 0.4]),
     shadowRadius: interpolate(t.value, [0, 1], [size * 0.6, size * 1.4]),
@@ -216,10 +233,13 @@ export function Entrance({ index, children, style }: {
 }
 
 export function HeroFloat({ children, style }: { children: ReactNode; style?: ViewStyle }) {
+  const reduced = useReducedMotion();
   const t = useSharedValue(0);
   useEffect(() => {
+    if (reduced) { t.value = 0; return; }
     t.value = withRepeat(withTiming(1, { duration: 3800, easing: ease }), -1, true);
-  }, [t]);
+    return () => cancelAnimation(t);
+  }, [t, reduced]);
   const anim = useAnimatedStyle(() => ({
     transform: [
       { translateY: interpolate(t.value, [0, 1], [-6, 6]) },

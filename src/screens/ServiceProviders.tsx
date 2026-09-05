@@ -29,18 +29,18 @@ export function ServiceProvidersScreen({
           <TextInput value={query} onChangeText={setQuery} placeholder="Search providers" placeholderTextColor={c.textSoft}
             style={{ flex: 1, color: c.text, fontSize: 15, outlineWidth: 0, outlineStyle: 'solid', outlineColor: 'transparent' }} />
         </View>
-        <Text style={{ color: c.textMuted, fontSize: 11, fontWeight: '800', letterSpacing: .7, marginTop: 18, marginBottom: 9 }}>AVAILABLE PROVIDERS</Text>
+        <Text style={{ color: c.textMuted, fontSize: 11, fontWeight: '600', letterSpacing: .7, marginTop: 18, marginBottom: 9 }}>AVAILABLE PROVIDERS</Text>
         {visibleProviders.map((provider) => (
           <Card key={provider.id} c={c} onPress={() => choose(provider)} style={styles.row}>
             <ProviderMark tone={provider.tone} letter={provider.mark} size={42} />
             <View style={{ flex: 1 }}>
-              <Text style={{ color: c.text, fontSize: 15, fontWeight: '800' }}>{provider.name}</Text>
+              <Text style={{ color: c.text, fontSize: 15, fontWeight: '600' }}>{provider.name}</Text>
               <Text style={{ color: c.textMuted, fontSize: 12, marginTop: 2 }}>{provider.detail}</Text>
             </View>
             {provider.id.includes('other') ? <Plus size={17} color={c.primary} /> : <ChevronRight size={17} color={c.textMuted} />}
           </Card>
         ))}
-        {!visibleProviders.length && <View style={[styles.empty, { backgroundColor: c.surface, borderColor: c.border }]}><Text style={{ color: c.text, fontWeight: '800' }}>No provider found</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 3 }}>Try another search or choose Other provider.</Text></View>}
+        {!visibleProviders.length && <View style={[styles.empty, { backgroundColor: c.surface, borderColor: c.border }]}><Text style={{ color: c.text, fontWeight: '600' }}>No provider found</Text><Text style={{ color: c.textMuted, fontSize: 12, marginTop: 3 }}>Try another search or choose Other provider.</Text></View>}
       </ScreenScroll>
     </View>
   );

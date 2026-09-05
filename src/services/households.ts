@@ -21,7 +21,8 @@ export async function fetchCurrentHousehold(userId: string): Promise<Household |
     .select('role, household:households(id,name,join_id)')
     .eq('user_id', userId)
     .maybeSingle();
-  if (error || !data || !data.household) return null;
+  if (error) throw new Error(error.message);
+  if (!data || !data.household) return null;
   const household = data.household as unknown as { id: string; name: string; join_id: string };
   return { ...household, role: data.role as Household['role'] };
 }
@@ -48,12 +49,15 @@ export async function fetchHouseholdUsers(householdId: string): Promise<Househol
     .eq('household_id', householdId)
     .order('role', { ascending: true })
     .order('joined_at');
-  if (error || !data) return [];
+  if (error) throw new Error(error.message);
+  if (!data) return [];
   const members = data as Array<Omit<HouseholdUser, 'profile'>>;
-  const { data: profiles } = await supabase
+  if (!members.length) return [];
+  const { data: profiles, error: profileError } = await supabase
     .from('profiles')
     .select('id,full_name')
     .in('id', members.map((member) => member.user_id));
+  if (profileError) throw new Error(profileError.message);
   const names = new Map((profiles || []).map((profile) => [profile.id, profile.full_name]));
   return members.map((member) => ({ ...member, profile: names.has(member.user_id) ? { full_name: names.get(member.user_id) || '' } : null }));
 }

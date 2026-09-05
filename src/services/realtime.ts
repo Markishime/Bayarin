@@ -91,11 +91,11 @@ export function useRealtimeNotifications(
 }
 
 export function useRealtimeHouseholdMembers(
-  userId: string,
+  householdId: string,
   handlers: {
     onInsert?: (member: Record<string, unknown>) => void;
     onDelete?: (old: Partial<Record<string, unknown>>) => void;
   },
 ) {
-  useRealtimeTable('household_members', userId, handlers.onInsert, undefined, handlers.onDelete);
+  useRealtimeTable('household_memberships', householdId, handlers.onInsert, undefined, handlers.onDelete, 'household_id');
 }

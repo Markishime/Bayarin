@@ -1,3 +1,4 @@
+import { Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   AlertTriangle, ArrowLeft, Check, ChevronRight, Eye, EyeOff, Info, KeyRound, LockKeyhole,
@@ -205,9 +206,10 @@ export function LoginScreen({
 }
 
 export function SignupScreen({
-  go, t, c, setAuthEmail, setEmailPurpose, onAuthenticated,
+  go, t, c, setAuthEmail, setEmailPurpose, onAuthenticated, preferences,
 }: {
   go: (s: Screen) => void; t: Copy; c: Palette;
+  preferences: Record<string, unknown>;
   setAuthEmail: (email: string) => void;
   setEmailPurpose: (purpose: 'signup' | 'recovery') => void;
   onAuthenticated: (user: User) => void;
@@ -239,7 +241,7 @@ export function SignupScreen({
     const { data, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { data: { full_name: name.trim(), onboarding_completed: true } },
+      options: { emailRedirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/callback', data: { ...preferences, full_name: name.trim(), onboarding_completed: true } },
     });
     setLoading(false);
     if (authError) { setError(readableAuthError(authError)); setErrorKey((k) => k + 1); return; }
@@ -279,7 +281,7 @@ export function SignupScreen({
               {accepted && <Check size={12} color="#fff" />}
             </View>
             <Text style={{ color: c.textMuted, fontSize: 12, flex: 1, lineHeight: 18 }}>
-              {t.auth.terms} <Text style={{ color: c.primary, fontWeight: '800' }}>{t.auth.termsLink}</Text> {t.auth.and} <Text style={{ color: c.primary, fontWeight: '800' }}>{t.auth.privacyLink}</Text>.
+              {t.auth.terms} <Text style={{ color: c.primary, fontWeight: '600' }}>{t.auth.termsLink}</Text> {t.auth.and} <Text style={{ color: c.primary, fontWeight: '600' }}>{t.auth.privacyLink}</Text>.
             </Text>
           </Pressable>
         </Entrance>
@@ -289,7 +291,7 @@ export function SignupScreen({
         <Entrance index={7}>
           <Pressable onPress={() => go('login')} style={{ alignItems: 'center', paddingVertical: 2 }}>
             <Text style={{ textAlign: 'center', color: c.textMuted, fontSize: 13 }}>
-              {t.auth.already} <Text style={{ color: c.primary, fontWeight: '800' }}>{t.auth.logIn}</Text>
+              {t.auth.already} <Text style={{ color: c.primary, fontWeight: '600' }}>{t.auth.logIn}</Text>
             </Text>
           </Pressable>
         </Entrance>
@@ -341,7 +343,7 @@ export function ForgotPasswordScreen({
     if (!valid) { setError(t.auth.invalidEmail); setErrorKey((k) => k + 1); return; }
     if (!supabase) { setError(supabaseSetupMessage); setErrorKey((k) => k + 1); return; }
     setLoading(true);
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(email.trim());
+    const { error: authError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/recovery' });
     setLoading(false);
     if (authError) { setError(readableAuthError(authError)); setErrorKey((k) => k + 1); return; }
     setAuthEmail(email.trim());
@@ -381,7 +383,7 @@ export function CheckEmailScreen({ go, t, c, email, purpose }: { go: (s: Screen)
     setMessage('');
     const { error } = purpose === 'signup'
       ? await supabase.auth.resend({ type: 'signup', email })
-      : await supabase.auth.resetPasswordForEmail(email);
+      : await supabase.auth.resetPasswordForEmail(email, { redirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/recovery' });
     setLoading(false);
     setMessage(error ? readableAuthError(error) : 'A new email is on its way.');
   };
@@ -406,7 +408,7 @@ export function CheckEmailScreen({ go, t, c, email, purpose }: { go: (s: Screen)
       </Entrance>
       <Entrance index={2}>
         <Text style={{ color: c.textMuted, textAlign: 'center', marginTop: 8, lineHeight: 20 }}>
-          {t.auth.emailBody} <Text style={{ color: c.text, fontWeight: '800' }}>{email || 'your email address'}</Text>.
+          {t.auth.emailBody} <Text style={{ color: c.text, fontWeight: '600' }}>{email || 'your email address'}</Text>.
         </Text>
       </Entrance>
       <Entrance index={3}>
@@ -513,11 +515,11 @@ const styles = StyleSheet.create({
   hero: { minHeight: 178, marginHorizontal: 18, marginBottom: 16, borderRadius: 22, overflow: 'hidden', justifyContent: 'flex-end', padding: 20 },
   heroImg: { position: 'absolute', right: -8, bottom: -18, width: 188, height: 188 },
   heroCopy: { width: '56%' },
-  kicker: { color: '#D5DCF8', fontSize: 11, letterSpacing: 1.3, fontWeight: '800' },
-  heroTitle: { color: '#F5F8FF', fontSize: 24, fontWeight: '800', marginTop: 6, letterSpacing: -0.5 },
+  kicker: { color: '#D5DCF8', fontSize: 11, letterSpacing: 1.3, fontWeight: '600' },
+  heroTitle: { color: '#F5F8FF', fontSize: 24, fontWeight: '600', marginTop: 6, letterSpacing: -0.5 },
   heroSub: { color: '#E4E9FA', fontSize: 13, marginTop: 4, lineHeight: 18 },
   form: { marginHorizontal: 18, borderRadius: 21, padding: 18, gap: 14, borderWidth: 1 },
-  label: { fontSize: 12, fontWeight: '800' },
+  label: { fontSize: 12, fontWeight: '600' },
   field: { minHeight: 54, borderWidth: 1.5, borderRadius: 16, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', gap: 10, shadowOffset: { width: 0, height: 0 }, elevation: 0 },
   input: { flex: 1, fontSize: 16, minHeight: 52, paddingVertical: 0, outlineWidth: 0, outlineStyle: 'solid', outlineColor: 'transparent' },
   banner: { flexDirection: 'row', gap: 8, padding: 12, borderRadius: 13, alignItems: 'flex-start' },

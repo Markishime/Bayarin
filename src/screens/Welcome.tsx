@@ -1,88 +1,46 @@
 import { LinearGradient } from 'expo-linear-gradient';
-import { Bell, CalendarDays, ChevronRight, Play, ShieldCheck } from 'lucide-react-native';
-import { Image, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ShieldCheck } from 'lucide-react-native';
+import { Image, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { BrandMark, PrimaryButton } from '../components/ui';
 import { images } from '../data';
 import type { Copy } from '../i18n';
 import { useLayout } from '../layout';
-import { Float3D, FadeScale, Stagger } from '../motion';
 import type { Palette } from '../theme';
 import type { Screen } from '../types';
 
 export function WelcomeScreen({ go, t, c }: { go: (s: Screen) => void; t: Copy; c: Palette }) {
   const insets = useSafeAreaInsets();
   const layout = useLayout();
-  return (
-    <View style={[styles.root, { justifyContent: 'space-between' }]}>
-      <View style={[StyleSheet.absoluteFill, styles.background, { pointerEvents: 'none' }]}>
-        <Image source={images.welcome} style={styles.backgroundImage} resizeMode="cover" accessibilityIgnoresInvertColors />
+  return <LinearGradient colors={['#040B49', '#061779', '#030B48']} locations={[0, .56, 1]} style={styles.root}>
+    <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ flexGrow: 1, minHeight: Math.max(720, layout.appHeight), paddingTop: insets.top + (layout.isCompact ? 30 : 65), paddingBottom: insets.bottom + 30 }}>
+      <View style={styles.brand}>
+        <BrandMark size={88} />
+        <Text style={styles.title}>{t.brand.name}</Text>
+        <Text style={styles.tag}>Bayad. Organisado. Panatag.</Text>
+        <Text style={styles.sub}>Para sa bawat pamilyang Pilipino.</Text>
       </View>
-      <LinearGradient colors={['rgba(8,16,48,0.18)', 'rgba(8,16,48,0.08)', 'rgba(6,12,40,0.55)']} style={[StyleSheet.absoluteFill, styles.backgroundOverlay]} />
-
-      <View style={[styles.top, styles.foreground, { paddingTop: insets.top + 8, paddingHorizontal: layout.pad }]}>
-        <Text style={styles.kicker}>{t.welcome.organize}</Text>
-        <Text style={styles.kicker}>{t.welcome.stayOnTrack}</Text>
+      <View style={{ flex: 1, minHeight: 290, maxHeight: 410, justifyContent: 'center' }}>
+        <Image source={images.welcome} resizeMode="contain" style={{ width: '106%', height: '100%', minHeight: 290, alignSelf: 'center' }} accessibilityLabel="A Filipino home with bill reminders and a Philippine flag" />
       </View>
-
-      <View style={[styles.brand, styles.foreground, { marginTop: layout.isCompact ? 12 : 28 }]}>
-        <BrandMark size={layout.isCompact ? 56 : 78} fontSize={layout.isCompact ? 34 : 48} />
-        <Stagger index={0}><Text style={[styles.title, { fontSize: layout.titleSize + (layout.isCompact ? 4 : 8) }]}>{t.brand.name}</Text></Stagger>
-        <Stagger index={1}><Text style={styles.tag}>{t.brand.tagline}</Text></Stagger>
-        <Stagger index={2}><Text style={styles.sub}>{t.brand.forFilipinos}</Text></Stagger>
+      <View style={styles.actions}>
+        <PrimaryButton title="Magsimula" onPress={() => go('onboarding')} c={c} />
+        <Pressable accessibilityRole="button" onPress={() => go('login')} style={styles.login}>
+          <Text style={{ color: '#FFFFFF', fontSize: 15 }}>May account na? <Text style={{ color: '#80B8FF' }}>Mag-login</Text></Text>
+        </Pressable>
+        <View style={styles.trust}><ShieldCheck size={24} color="#BBC6EF" /><Text style={styles.trustText}>Hindi e-wallet. Hindi tumatanggap ng pera. Bayarin ay gabay at tagasubaybay lamang.</Text></View>
       </View>
-
-      {!layout.isCompact && <View style={[styles.rail, styles.foreground, { paddingHorizontal: layout.pad }]}>
-        {[
-          { Icon: CalendarDays, label: t.welcome.featureOrg },
-          { Icon: Bell, label: t.welcome.featureRemind },
-          { Icon: ShieldCheck, label: t.welcome.featureSafe },
-        ].map(({ Icon, label }, i) => (
-          <Stagger key={label} index={i + 3}>
-            <Float3D delay={i * 160} intensity={0.7}>
-              <View style={styles.chip}>
-                <Icon size={15} color="#FFD45C" />
-                <Text style={styles.chipText}>{label}</Text>
-              </View>
-            </Float3D>
-          </Stagger>
-        ))}
-      </View>}
-
-      <View style={[styles.actions, styles.foreground, { paddingBottom: insets.bottom + 20, paddingHorizontal: layout.pad, maxWidth: 520, width: '100%', alignSelf: 'center' }]}>
-        <FadeScale delay={120}>
-          <PrimaryButton title={t.welcome.start} onPress={() => go('onboarding')} light c={c} icon={<ChevronRight size={18} color="#253CC0" />} />
-        </FadeScale>
-        <FadeScale delay={320}>
-          <Pressable onPress={() => go('login')} style={styles.loginLink}>
-            <Text style={styles.loginMuted}>{t.brand.hasAccount} </Text>
-            <Text style={styles.loginBold}>{t.brand.login}</Text>
-          </Pressable>
-        </FadeScale>
-      </View>
-    </View>
-  );
+    </ScrollView>
+  </LinearGradient>;
 }
-
 const styles = StyleSheet.create({
-  root: { flex: 1, backgroundColor: '#07195F', overflow: 'hidden' },
-  background: { zIndex: 0, overflow: 'hidden' },
-  backgroundImage: { width: '100%', height: '100%' },
-  backgroundOverlay: { zIndex: 1 },
-  foreground: { zIndex: 2 },
-  top: { flexDirection: 'row', justifyContent: 'space-between' },
-  kicker: { color: '#E8ECFF', fontSize: 11, letterSpacing: 1.1, textTransform: 'uppercase', fontWeight: '700' },
-  brand: { alignItems: 'center', marginTop: 28 },
-  title: { color: '#fff', fontWeight: '900', letterSpacing: -1.6, marginTop: 16, textShadowColor: 'rgba(0,0,40,0.35)', textShadowRadius: 16 },
-  tag: { color: '#fff', fontSize: 16, fontWeight: '700' },
-  sub: { color: '#E1E4FF', fontSize: 13, marginTop: 8 },
-  rail: { flexDirection: 'row', justifyContent: 'center', flexWrap: 'wrap', gap: 8 },
-  chip: { minWidth: 96, paddingVertical: 10, paddingHorizontal: 10, borderRadius: 15, borderWidth: 1, borderColor: 'rgba(255,255,255,0.18)', backgroundColor: 'rgba(8,17,79,0.55)', flexDirection: 'row', alignItems: 'center', gap: 6 },
-  chipText: { color: '#fff', fontSize: 11, fontWeight: '800' },
-  actions: { paddingTop: 16 },
-  storyLink: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 6, marginTop: 14 },
-  storyText: { color: '#fff', fontSize: 13, fontWeight: '800' },
-  loginLink: { flexDirection: 'row', justifyContent: 'center', marginTop: 12 },
-  loginMuted: { color: '#E0E4FF', fontSize: 13 },
-  loginBold: { color: '#fff', fontSize: 13, fontWeight: '800' },
+  root: { flex: 1 },
+  brand: { alignItems: 'center', paddingHorizontal: 20 },
+  title: { color: '#FFFFFF', fontSize: 50, fontWeight: '700', letterSpacing: -1.8, marginTop: 2 },
+  tag: { color: '#FFFFFF', fontSize: 16, fontWeight: '500', marginTop: 10 },
+  sub: { color: '#FFFFFF', fontSize: 14, marginTop: 7 },
+  actions: { paddingHorizontal: 22, paddingTop: 8 },
+  login: { alignItems: 'center', justifyContent: 'center', minHeight: 60 },
+  trust: { flexDirection: 'row', alignSelf: 'center', gap: 12, maxWidth: 275, paddingTop: 22 },
+  trustText: { flex: 1, color: '#D6DCF7', fontSize: 12, lineHeight: 18 },
 });

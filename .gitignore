@@ -51,3 +51,8 @@ Thumbs.db
 /.grok-verify/
 /supabase/.temp/
 .vercel
+
+# Isolated visual review export
+/review-dist/
+/dist-review/
+/dist-platform-check/

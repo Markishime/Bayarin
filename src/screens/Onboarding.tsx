@@ -1,3 +1,4 @@
+import { ServiceArt } from '../components/Artwork';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   ArrowLeft, Check, ChevronRight, Moon, Sun,
@@ -79,7 +80,7 @@ export function OnboardingScreen({
                   <Pressable key={opt.id} onPress={() => setLang(opt.id)}
                     style={[styles.langCard, { backgroundColor: c.surface, borderColor: selected ? c.primary : c.border }]}>
                     <View style={[styles.langCode, { backgroundColor: selected ? c.primary : c.primarySoft }]}>
-                      <Text style={{ color: selected ? '#fff' : c.primary, fontWeight: '900', fontSize: 12 }}>{opt.code}</Text>
+                      <Text style={{ color: selected ? '#fff' : c.primary, fontWeight: '700', fontSize: 12 }}>{opt.code}</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={[styles.langName, { color: c.text }]}>{meta.native}</Text>
@@ -108,7 +109,7 @@ export function OnboardingScreen({
                     const nextServices = selected ? draft.services.filter((s) => s !== id) : [...draft.services, id];
                     setDraft({ ...draft, services: nextServices.length ? nextServices : [id] });
                   }} style={[styles.serviceTile, { backgroundColor: selected ? c.primarySoft : c.surface, borderColor: selected ? c.primary : c.border }]}>
-                    <Text style={[styles.serviceLabel, { color: selected ? c.primary : c.text }]}>{t.services[id]}</Text>
+                    <ServiceArt kind={id} size={30} /><Text style={[styles.serviceLabel, { color: selected ? c.primary : c.text }]}>{t.services[id]}</Text>
                     {selected && <Check size={14} color={c.primary} />}
                   </Pressable>
                 );
@@ -143,7 +144,7 @@ export function OnboardingScreen({
                   <View style={styles.themeLine} />
                   <View style={[styles.themeLine, { width: '65%' }]} />
                 </View>
-                <View style={styles.themeLabel}><Sun size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.onboarding.themeLight}</Text></View>
+                <View style={styles.themeLabel}><Sun size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '600' }}>{t.onboarding.themeLight}</Text></View>
               </Pressable>
               <Pressable onPress={() => setDark(true)} style={[styles.themeCard, { borderColor: dark ? c.primary : c.border, backgroundColor: c.surface }]}>
                 <View style={[styles.themePreview, { backgroundColor: '#12182A' }]}>
@@ -151,7 +152,7 @@ export function OnboardingScreen({
                   <View style={[styles.themeLine, { backgroundColor: '#263352' }]} />
                   <View style={[styles.themeLine, { width: '65%', backgroundColor: '#263352' }]} />
                 </View>
-                <View style={styles.themeLabel}><Moon size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '800' }}>{t.onboarding.themeDark}</Text></View>
+                <View style={styles.themeLabel}><Moon size={14} color={c.text} /><Text style={{ color: c.text, fontWeight: '600' }}>{t.onboarding.themeDark}</Text></View>
               </Pressable>
             </View>
           </View>
@@ -179,7 +180,7 @@ export function OnboardingScreen({
         />
         <Pressable onPress={() => go('login')} style={{ marginTop: 14, alignItems: 'center' }}>
           <Text style={{ color: c.textMuted, fontSize: 13 }}>
-            {t.onboarding.already} <Text style={{ color: c.primary, fontWeight: '800' }}>{t.brand.login}</Text>
+            {t.onboarding.already} <Text style={{ color: c.primary, fontWeight: '600' }}>{t.brand.login}</Text>
           </Text>
         </Pressable>
       </View>
@@ -191,22 +192,22 @@ const styles = StyleSheet.create({
   root: { flex: 1, minHeight: 0, overflow: 'hidden' },
   topBar: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: 18, height: 44 },
   iconBtn: { width: 40, height: 40, alignItems: 'center', justifyContent: 'center' },
-  skip: { fontSize: 13, fontWeight: '800' },
+  skip: { fontSize: 13, fontWeight: '600' },
   stepLabel: { fontSize: 12, fontWeight: '700' },
   progressTrack: { flexDirection: 'row', gap: 4, paddingHorizontal: 20, marginTop: 6 },
   progressSeg: { flex: 1, height: 4, borderRadius: 4 },
   body: { flex: 1 },
   pad: { paddingHorizontal: 24, paddingTop: 22 },
-  eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: '800' },
-  h1: { fontSize: 28, lineHeight: 34, letterSpacing: -0.8, fontWeight: '800', marginTop: 10 },
+  eyebrow: { fontSize: 11, letterSpacing: 1.4, fontWeight: '600' },
+  h1: { fontSize: 28, lineHeight: 34, letterSpacing: -0.8, fontWeight: '600', marginTop: 10 },
   bodyText: { fontSize: 15, lineHeight: 22, marginTop: 10 },
   langCard: { flexDirection: 'row', alignItems: 'center', gap: 12, padding: 14, borderRadius: 18, borderWidth: 1.5 },
   langCode: { width: 44, height: 44, borderRadius: 14, alignItems: 'center', justifyContent: 'center' },
-  langName: { fontSize: 16, fontWeight: '800' },
+  langName: { fontSize: 16, fontWeight: '600' },
   radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, alignItems: 'center', justifyContent: 'center' },
   serviceGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10, marginTop: 20 },
   serviceTile: { width: '47%', minHeight: 56, borderRadius: 16, borderWidth: 1.5, paddingHorizontal: 14, flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between' },
-  serviceLabel: { fontSize: 14, fontWeight: '800' },
+  serviceLabel: { fontSize: 14, fontWeight: '600' },
   sheet: { marginTop: 18, borderRadius: 18, paddingHorizontal: 14, borderWidth: 1 },
   themeRow: { flexDirection: 'row', gap: 12, marginTop: 20 },
   themeCard: { flex: 1, borderWidth: 2, borderRadius: 18, padding: 8 },
