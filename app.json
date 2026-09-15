@@ -8,12 +8,6 @@
     "userInterfaceStyle": "automatic",
     "scheme": "bayarin",
     "description": "Bayarin helps Filipino households organize, track, and pay their bills on time. Bayad. Organisado. Panatag.",
-    "privacy": "hidden",
-    "splash": {
-      "image": "./assets/splash-icon.png",
-      "resizeMode": "contain",
-      "backgroundColor": "#102B9A"
-    },
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "app.bayarin.household",
@@ -73,7 +67,7 @@
           "android": {
             "minSdkVersion": 24,
             "targetSdkVersion": 35,
-            "compileSdkVersion": 35
+            "compileSdkVersion": 36
           }
         }
       ],
