@@ -20,7 +20,9 @@
       "buildNumber": "1",
       "infoPlist": {
         "NSUserTrackingUsageDescription": "",
-        "UIBackgroundModes": ["remote-notification"]
+        "UIBackgroundModes": [
+          "remote-notification"
+        ]
       }
     },
     "android": {
@@ -65,7 +67,7 @@
         "expo-build-properties",
         {
           "ios": {
-            "deploymentTarget": "15.1",
+            "deploymentTarget": "16.4",
             "useFrameworks": "static"
           },
           "android": {
@@ -80,6 +82,12 @@
       "expo-image",
       "expo-sharing",
       "expo-document-picker"
-    ]
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "62507f72-986a-4596-b04d-2d2d20a02e82"
+      }
+    },
+    "owner": "markishime"
   }
 }
