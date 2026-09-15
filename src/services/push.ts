@@ -1,15 +1,14 @@
-import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { supabase } from '../lib/supabase';
 import { localDateKey } from './bill-rules';
 
-if (Platform.OS !== 'web') Notifications.setNotificationHandler({
+Notifications.setNotificationHandler({
   handleNotification: async () => ({ shouldShowBanner: true, shouldShowList: true, shouldPlaySound: true, shouldSetBadge: false }),
 });
 
 export async function registerForPushNotifications(_userId: string): Promise<void> {
-  if (Platform.OS === 'web') return;
   if (Platform.OS === 'android') await Notifications.setNotificationChannelAsync('bill-reminders', { name: 'Bill reminders', importance: Notifications.AndroidImportance.DEFAULT });
   const permission = await Notifications.requestPermissionsAsync();
   if (permission.status !== 'granted') throw new Error('Device notifications are off. Enable them in your device settings to receive reminders.');
@@ -18,7 +17,7 @@ export async function registerForPushNotifications(_userId: string): Promise<voi
 let scheduling = Promise.resolve();
 export function scheduleAllDueReminders(householdId: string, userId?: string): Promise<void> {
   const run = async () => {
-    if (Platform.OS === 'web' || !supabase || !householdId) return;
+    if (!supabase || !householdId) return;
     if ((await Notifications.getPermissionsAsync()).status !== 'granted') return;
     const { data: bills, error } = await supabase.from('bills').select('*').eq('household_id', householdId).not('status', 'in', '(paid,archived,draft)').order('due_date');
     if (error) throw new Error(error.message);
@@ -53,7 +52,6 @@ export function scheduleAllDueReminders(householdId: string, userId?: string): P
 }
 
 export async function cancelAllLocalReminders(): Promise<void> {
-  if (Platform.OS === 'web') return;
   await scheduling.catch(() => {});
   for (const item of await Notifications.getAllScheduledNotificationsAsync()) if (item.content.data?.bayarin) await Notifications.cancelScheduledNotificationAsync(item.identifier);
 }

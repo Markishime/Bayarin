@@ -2,11 +2,13 @@
   "expo": {
     "name": "Bayarin",
     "slug": "bayarin",
-    "version": "2.0.0",
+    "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "bayarin",
+    "description": "Bayarin helps Filipino households organize, track, and pay their bills on time. Bayad. Organisado. Panatag.",
+    "privacy": "hidden",
     "splash": {
       "image": "./assets/splash-icon.png",
       "resizeMode": "contain",
@@ -14,7 +16,12 @@
     },
     "ios": {
       "supportsTablet": true,
-      "bundleIdentifier": "app.bayarin.household"
+      "bundleIdentifier": "app.bayarin.household",
+      "buildNumber": "1",
+      "infoPlist": {
+        "NSUserTrackingUsageDescription": "",
+        "UIBackgroundModes": ["remote-notification"]
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -24,18 +31,54 @@
         "monochromeImage": "./assets/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "app.bayarin.household"
-    },
-    "web": {
-      "favicon": "./assets/favicon.png",
-      "bundler": "metro"
+      "package": "app.bayarin.household",
+      "versionCode": 1,
+      "permissions": [
+        "android.permission.INTERNET",
+        "android.permission.POST_NOTIFICATIONS",
+        "android.permission.RECEIVE_BOOT_COMPLETED",
+        "android.permission.VIBRATE",
+        "android.permission.WAKE_LOCK"
+      ]
     },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#102B9A",
+          "image": "./assets/splash-icon.png",
+          "imageWidth": 180,
+          "resizeMode": "contain"
+        }
+      ],
+      [
+        "expo-notifications",
+        {
+          "icon": "./assets/android-icon-foreground.png",
+          "color": "#102B9A",
+          "sounds": [],
+          "defaultChannel": "bill-reminders",
+          "enableBackgroundRemoteNotifications": false
+        }
+      ],
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "deploymentTarget": "15.1",
+            "useFrameworks": "static"
+          },
+          "android": {
+            "minSdkVersion": 24,
+            "targetSdkVersion": 35,
+            "compileSdkVersion": 35
+          }
+        }
+      ],
       "expo-video",
       "expo-web-browser",
       "expo-image",
       "expo-sharing",
-      "expo-notifications",
       "expo-document-picker"
     ]
   }

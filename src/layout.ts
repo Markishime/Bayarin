@@ -2,11 +2,8 @@ import { useWindowDimensions } from 'react-native';
 
 export function useLayout() {
   const { width, height } = useWindowDimensions();
-  const framed = width >= 540;
-  const frameWidth = 420;
-  const frameHeight = Math.max(280, height - 32);
-  const appWidth = framed ? frameWidth : width;
-  const appHeight = framed ? frameHeight : height;
+  const appWidth = width;
+  const appHeight = height;
   const isCompact = appHeight < 740;
   const pad = 18;
   const titleSize = isCompact ? 26 : 28;
@@ -15,13 +12,13 @@ export function useLayout() {
   return {
     width,
     height,
-    framed,
-    frameWidth,
-    frameHeight,
+    framed: false,
+    frameWidth: width,
+    frameHeight: height,
     appWidth,
     appHeight,
-    isPhone: !framed,
-    isTablet: framed && width < 1000,
+    isPhone: true,
+    isTablet: false,
     isDesktop: false,
     isCompact,
     pad,

@@ -1,5 +1,4 @@
 import { useEffect, useRef } from 'react';
-import { Platform } from 'react-native';
 import * as Notifications from 'expo-notifications';
 import { useBills } from '../services/bill-context';
 import type { Screen } from '../types';
@@ -9,7 +8,7 @@ export function NotificationNavigation({ householdId, go }: { householdId: strin
   const navigate = useRef(go);
   navigate.current = go;
   useEffect(() => {
-    if (Platform.OS === 'web' || !householdId) return;
+    if (!householdId) return;
     let active = true;
     const open = (response: Notifications.NotificationResponse | null) => {
       const data = response?.notification.request.content.data;

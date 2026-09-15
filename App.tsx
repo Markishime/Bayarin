@@ -3,7 +3,7 @@ import { NotificationNavigation } from './src/components/NotificationNavigation'
 import { ReducedMotionConfig, ReduceMotion } from 'react-native-reanimated';
 import { StatusBar } from 'expo-status-bar';
 import { useEffect, useMemo, useState } from 'react';
-import { AppState, Linking, Platform, Text, View } from 'react-native';
+import { AppState, Linking, Text, View } from 'react-native';
 import { GestureHandlerRootView } from 'react-native-gesture-handler';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import type { Session, User } from '@supabase/supabase-js';
@@ -57,22 +57,6 @@ export default function App() {
     setScreen(next);
   };
 
-  useEffect(() => {
-    if (Platform.OS !== 'web' || typeof document === 'undefined') return;
-    const html = document.documentElement;
-    const body = document.body;
-    const root = document.getElementById('root');
-    html.style.height = '100%';
-    html.style.overflow = 'hidden';
-    body.style.height = '100%';
-    body.style.margin = '0';
-    body.style.overflow = 'hidden';
-    if (root) {
-      root.style.height = '100%';
-      root.style.display = 'flex';
-      root.style.flex = '1';
-    }
-  }, []);
   const userId = session?.user.id || '';
 
   useEffect(() => {
@@ -165,7 +149,7 @@ export default function App() {
   }, [dark, lang, profileReady, session]);
 
   useEffect(() => {
-    if (!supabase || Platform.OS === 'web') return;
+    if (!supabase) return;
     const client = supabase;
     const receive = async (url: string) => {
       if (!url.startsWith('bayarin://auth')) return;

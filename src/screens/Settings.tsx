@@ -12,7 +12,7 @@ import {
   Languages, LogOut, Moon, Pencil, Play, ShieldCheck, Sun, Users, X,
 } from 'lucide-react-native';
 import { useEffect, useState, type ReactNode } from 'react';
-import { Image, Platform, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
+import { Image, Pressable, StyleSheet, Switch, Text, View } from 'react-native';
 import Animated, { useAnimatedStyle, useSharedValue, withSpring } from 'react-native-reanimated';
 import { AppHeader, BottomNav, BrandLogo, Card, CinematicHero, Field, InfoBanner, PrefSwitch, PrimaryButton, ScreenScroll } from '../components/ui';
 import { images } from '../data';
@@ -51,7 +51,7 @@ export function SettingsScreen({
           <Row icon={<History size={15} color={c.primary} />} label={t.settings.activity} onPress={() => go('activity')} c={c} />
         </Group>
         <Group title={t.settings.aboutGroup} c={c}>
-          <Row icon={<Info size={15} color={c.primary} />} label={t.settings.about} value="Version 2.0" onPress={() => go('about')} c={c} />
+          <Row icon={<Info size={15} color={c.primary} />} label={t.settings.about} value="Version 1.0" onPress={() => go('about')} c={c} />
         </Group>
         <Pressable onPress={onLogout} style={[styles.logout, { borderColor: c.border, backgroundColor: c.surface }]}>
           <LogOut size={16} color={c.danger} />
@@ -402,7 +402,7 @@ export function NotificationSettingsScreen({
         </Card>
         <View style={{ marginTop: 18 }}>
           <PrimaryButton loading={busy} title={saved ? t.notifSettings.saved : t.notifSettings.save} onPress={() => void save()} c={c} icon={<Check size={16} color="#fff" />} />
-          <View style={{ marginTop: 16 }}>{Platform.OS === 'web' ? <InfoBanner c={c}>In-app reminders are available here. Enable device reminders from the iOS or Android app.</InfoBanner> : <PrimaryButton title="Enable device reminders" onPress={() => void enableDevice()} c={c} />}{deviceMessage ? <Text style={{ color: c.textMuted, marginTop: 12 }}>{deviceMessage}</Text> : null}</View>
+          <View style={{ marginTop: 16 }}><PrimaryButton title="Enable device reminders" onPress={() => void enableDevice()} c={c} />{deviceMessage ? <Text style={{ color: c.textMuted, marginTop: 12 }}>{deviceMessage}</Text> : null}</View>
         </View>
       </ScreenScroll>
     </View>
@@ -426,17 +426,12 @@ export function ExportDataScreen({ go, t, c, userId, householdId }: { go: (s: Sc
       const failure = results.find(result => result.error)?.error;
       if (failure) throw new Error(failure.message);
       const json = JSON.stringify({ profile: results[0].data, bills: results[1].data, activity: results[2].data, preferences: results[3].data, exported_at: new Date().toISOString() }, null, 2);
-      if (Platform.OS === 'web') {
-        const url = URL.createObjectURL(new Blob([json], { type: 'application/json' }));
-        const anchor = document.createElement('a'); anchor.href = url; anchor.download = 'bayarin-household-export.json'; document.body.appendChild(anchor); anchor.click(); anchor.remove(); setTimeout(() => URL.revokeObjectURL(url), 1000);
-      } else {
-        const FileSystem = await import('expo-file-system/legacy');
-        if (!FileSystem.cacheDirectory) throw new Error('Local file storage is unavailable.');
-        const path = FileSystem.cacheDirectory + 'bayarin-household-export.json';
-        await FileSystem.writeAsStringAsync(path, json);
-        if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
-        await Sharing.shareAsync(path, { mimeType: 'application/json' });
-      }
+      const FileSystem = await import('expo-file-system/legacy');
+      if (!FileSystem.cacheDirectory) throw new Error('Local file storage is unavailable.');
+      const path = FileSystem.cacheDirectory + 'bayarin-household-export.json';
+      await FileSystem.writeAsStringAsync(path, json);
+      if (!(await Sharing.isAvailableAsync())) throw new Error('Sharing is unavailable on this device.');
+      await Sharing.shareAsync(path, { mimeType: 'application/json' });
       setDone(true);
     } catch (reason) { setError(reason instanceof Error ? reason.message : 'Could not export your records.'); }
     finally { setExporting(false); }

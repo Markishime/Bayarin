@@ -1,4 +1,4 @@
-import { Linking, Platform } from 'react-native';
+import { Linking } from 'react-native';
 
 const sites: Record<string, string> = {
   meralco: 'https://online.meralco.com.ph/', maynilad: 'https://mywaterbill.mayniladwater.com.ph/',
@@ -15,7 +15,7 @@ export async function openPaymentDestination(method: string, provider = '') {
   const website = method === 'GCash' ? 'https://gcash.com/' : method === 'Maya' ? 'https://www.maya.ph/' : method === 'BPI' ? 'https://online.bpi.com.ph/' : providerUrl(provider);
   if (!website) throw new Error('Copy your bill details and use your bank or your provider’s official app.');
   const scheme = method === 'GCash' ? 'gcash://' : method === 'Maya' ? 'paymaya://' : null;
-  if (scheme && Platform.OS !== 'web') {
+  if (scheme) {
     try { await Linking.openURL(scheme); return; } catch { /* Open the official website when the app is unavailable. */ }
   }
   await Linking.openURL(website);

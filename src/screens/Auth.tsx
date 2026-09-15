@@ -1,4 +1,3 @@
-import { Platform } from 'react-native';
 import { LinearGradient } from 'expo-linear-gradient';
 import {
   AlertTriangle, ArrowLeft, Check, ChevronRight, Eye, EyeOff, Info, KeyRound, LockKeyhole,
@@ -241,7 +240,7 @@ export function SignupScreen({
     const { data, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
-      options: { emailRedirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/callback', data: { ...preferences, full_name: name.trim(), onboarding_completed: true } },
+      options: { emailRedirectTo: 'bayarin://auth/callback', data: { ...preferences, full_name: name.trim(), onboarding_completed: true } },
     });
     setLoading(false);
     if (authError) { setError(readableAuthError(authError)); setErrorKey((k) => k + 1); return; }
@@ -343,7 +342,7 @@ export function ForgotPasswordScreen({
     if (!valid) { setError(t.auth.invalidEmail); setErrorKey((k) => k + 1); return; }
     if (!supabase) { setError(supabaseSetupMessage); setErrorKey((k) => k + 1); return; }
     setLoading(true);
-    const { error: authError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/recovery' });
+    const { error: authError } = await supabase.auth.resetPasswordForEmail(email.trim(), { redirectTo: 'bayarin://auth/recovery' });
     setLoading(false);
     if (authError) { setError(readableAuthError(authError)); setErrorKey((k) => k + 1); return; }
     setAuthEmail(email.trim());
@@ -383,7 +382,7 @@ export function CheckEmailScreen({ go, t, c, email, purpose }: { go: (s: Screen)
     setMessage('');
     const { error } = purpose === 'signup'
       ? await supabase.auth.resend({ type: 'signup', email })
-      : await supabase.auth.resetPasswordForEmail(email, { redirectTo: Platform.OS === 'web' ? window.location.origin : 'bayarin://auth/recovery' });
+      : await supabase.auth.resetPasswordForEmail(email, { redirectTo: 'bayarin://auth/recovery' });
     setLoading(false);
     setMessage(error ? readableAuthError(error) : 'A new email is on its way.');
   };
